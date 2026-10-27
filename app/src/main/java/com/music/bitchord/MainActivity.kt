@@ -5243,10 +5243,11 @@ private fun BitChordApp(
                     canDownload = update.apkUrl != null,
                     hazeState = hazeState,
                     // A download in progress keeps running behind the closed
-                    // sheet — only the sheet itself goes away. The top bar's
+                    // sheet — only the sheet itself goes away. The top-bar
                     // update icon reopens it onto whatever state it reached.
                     onDismiss = {
-                        AppUpdateChecker.dismiss(context, update.version)
+                        // "Update Later" hides this launch's prompt but keeps
+                        // the pending release for the top bar and next launch.
                         showUpdateDialog = false
                     },
                     onDownload = {
@@ -5254,7 +5255,6 @@ private fun BitChordApp(
                             scope.launch { AppUpdateChecker.downloadApk(context) }
                         } else {
                             Toast.makeText(context, "No compatible verified APK is attached to this release.", Toast.LENGTH_LONG).show()
-                            AppUpdateChecker.dismiss(context, update.version)
                             showUpdateDialog = false
                         }
                     },
