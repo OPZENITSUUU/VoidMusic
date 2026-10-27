@@ -168,6 +168,14 @@ fun MediaController.upgradeQuality() {
     )
 }
 
+/** Re-resolves the current stream in place, preserving its queue item and playhead. */
+fun MediaController.refreshSong() {
+    sendCustomCommand(
+        SessionCommand(ACTION_REFRESH_SONG, Bundle.EMPTY),
+        Bundle.EMPTY,
+    )
+}
+
 /**
  * Asks the service to revert the playing track to YouTube's original stream.
  */

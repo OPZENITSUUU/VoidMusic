@@ -70,6 +70,9 @@ import kotlin.coroutines.coroutineContext
 object AudioCache {
 
     private const val TAG = "BitChord"
+    /** Custom URI marker that gives a manually refreshed rendition a fresh cache key. */
+    const val REFRESH_PARAM = "refresh"
+    private const val MIN_FREE_READ_AHEAD_BYTES = 64L * 1024 * 1024
 
     /**
      * The disk budget, straight from [AppSettings] — 512MB by default, roughly
@@ -192,6 +195,7 @@ object AudioCache {
     const val QUEUE_DEPTH = QUEUE_LOOKAHEAD + 1
 
     private lateinit var cache: SimpleCache
+    private lateinit var cacheDirectory: File
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -203,8 +207,9 @@ object AudioCache {
      */
     fun init(context: Context) {
         evictor.maxBytes = AppSettings.audioCacheLimitBytes.value
+        cacheDirectory = File(context.cacheDir, "audio")
         cache = SimpleCache(
-            File(context.cacheDir, "audio"),
+            cacheDirectory,
             evictor,
             StandaloneDatabaseProvider(context),
         )
@@ -371,8 +376,12 @@ object AudioCache {
     const val WATCH_READ_PARAM = "watch_read"
 
     private val keyFactory = CacheKeyFactory { spec ->
-        val key = phoneKey(spec)
-        if (spec.uri.getQueryParameter(WATCH_READ_PARAM) != null) "$key#watch" else key
+        val base = phoneKey(spec)
+        val refreshed = spec.uri.getQueryParameter(REFRESH_PARAM)
+            ?.takeIf(String::isNotBlank)
+            ?.let { "$base#refresh-$it" }
+            ?: base
+        if (spec.uri.getQueryParameter(WATCH_READ_PARAM) != null) "$refreshed#watch" else refreshed
     }
 
     private fun phoneKey(spec: androidx.media3.datasource.DataSpec): String =
@@ -815,6 +824,8 @@ object AudioCache {
                 val scheme = dataSpec.uri.scheme
                 activeDs = if (scheme == "file" || scheme == "content") {
                     upstreamDs
+                } else if (!diskCacheAllowed(dataSpec.uri)) {
+                    upstreamDs
                 } else {
                     cacheDs
                 }
@@ -831,6 +842,36 @@ object AudioCache {
             }
         }
     }
+
+    /** Whether this request may be written to or served from the persistent audio cache. */
+    private fun diskCacheAllowed(uri: Uri): Boolean {
+        if (uri.scheme != "bitchord") return true
+        // Automix's analysis copy is a deliberate YouTube-only request, not a
+        // third-party playback cache entry.
+        if (AutomixAnalysisSource.requestsYouTubeOpus(
+                uri.getQueryParameter(AutomixAnalysisSource.OPUS_QUERY_PARAMETER),
+            )
+        ) return true
+        val mediaId = mediaIdIn(uri)
+        val stream = QualityUpgrade.forcedStream(uri)
+            ?: mediaId?.let(StreamChoice::of)
+        val sourceId = stream?.sourceConfigId ?: uri.getQueryParameter("s")
+        if (sourceId != null) {
+            val config = SourceRegistry.config(sourceId) ?: return false
+            if (!config.enabled) return false
+            if (config.kind.isUserAdded && !config.networkAccessAuthorized) return false
+            return config.allowDownloads
+        }
+        // If substitution is possible but its winner is not known yet, do not
+        // guess that an unknown provider permits persistent copies.
+        if (uri.getQueryParameter("v") != null && SourceResolver.canSubstituteForYouTube()) return false
+        return true
+    }
+
+    private fun hasReadAheadSpace(): Boolean =
+        ::cacheDirectory.isInitialized && runCatching {
+            cacheDirectory.usableSpace >= MIN_FREE_READ_AHEAD_BYTES
+        }.getOrDefault(false)
 
     private fun cacheFactory(upstream: DataSource.Factory) = CacheDataSource.Factory()
         .setCache(cache)
@@ -974,10 +1015,19 @@ object AudioCache {
                 } else {
                     null
                 }
+                val warmedPolicyAllowsCache = when {
+                    warmed == null -> !substitutable
+                    warmed.sourceConfigId == null -> true
+                    else -> SourceRegistry.config(warmed.sourceConfigId)?.let { config ->
+                        config.enabled && (!config.kind.isUserAdded || config.networkAccessAuthorized) &&
+                            config.allowDownloads
+                    } == true
+                }
                 // Safe to fill for the same reason in both cases: either nothing
                 // outranks YouTube and read-ahead is the only writer, or a
                 // source has been pinned and every writer now resolves to it.
-                val cacheBytes = (!substitutable || warmed != null) && !pinnedToYouTube
+                val cacheBytes = (!substitutable || warmed != null) && !pinnedToYouTube &&
+                    warmedPolicyAllowsCache && hasReadAheadSpace()
                 if (cacheBytes) {
                     launch(TrackLog.about(next)) {
                         delay(PREFETCH_DELAY_MS)
@@ -1034,6 +1084,10 @@ object AudioCache {
      * it. A few spaced retries cover the hand-over, and then it is left alone.
      */
     private suspend fun fetchWhole(videoId: String) {
+        if (!hasReadAheadSpace()) {
+            TrackLog.d(TAG, "low free space; stopping whole-track read-ahead for $videoId", about = videoId)
+            return
+        }
         repeat(MAX_ATTEMPTS) {
             // The race this retry loop exists to cover is the *queue's own*:
             // cancelling [job] tells a blocking network read to stop, but that
@@ -1060,6 +1114,13 @@ object AudioCache {
     private suspend fun cacheWholeOnce(videoId: String): Boolean {
         val total = runCatching { StreamResolver.contentLength(videoId) }.getOrNull()
             ?: return false
+        val cached = cache.getCachedBytes(videoId, 0, total).coerceAtLeast(0L)
+        val writable = runCatching { cacheDirectory.usableSpace - MIN_FREE_READ_AHEAD_BYTES }
+            .getOrDefault(0L)
+        if (total - cached > writable) {
+            TrackLog.d(TAG, "track exceeds safe free-space budget; keeping only its opening buffer", about = videoId)
+            return true
+        }
 
         var position = 0L
         while (position < total) {
@@ -1120,6 +1181,7 @@ object AudioCache {
     }
 
     suspend fun warmRange(uri: Uri, position: Long, length: Long) {
+        if (!diskCacheAllowed(uri) || !hasReadAheadSpace()) return
         val key = keyFactory.buildCacheKey(DataSpec(uri))
         fetch(key, uri, position, length)
     }
@@ -1806,7 +1868,7 @@ object AudioCache {
         length: Long,
         pinKey: Boolean = false,
     ) {
-        if (upstreamFactory == null) return
+        if (upstreamFactory == null || !diskCacheAllowed(uri) || !hasReadAheadSpace()) return
         if (cache.getCachedBytes(cacheKey, position, length) >= length) return
 
         // A cheap first knock rather than the whole range on the door.

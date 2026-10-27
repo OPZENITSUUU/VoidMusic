@@ -220,6 +220,8 @@ const val ACTION_COMMIT_RADIO_QUEUE = "com.music.bitchord.action.COMMIT_RADIO_QU
 
 /** Session command behind the player menu's "Upgrade quality". */
 const val ACTION_UPGRADE_QUALITY = "com.music.bitchord.action.UPGRADE_QUALITY"
+/** Session command behind the Now Playing menu's "Refresh song" action. */
+const val ACTION_REFRESH_SONG = "com.music.bitchord.action.REFRESH_SONG"
 
 /**
  * App-side gate for explicit quality retries.
@@ -774,10 +776,12 @@ class PlaybackService : MediaLibraryService() {
     private val beginRadioQueueCommand = SessionCommand(ACTION_BEGIN_RADIO_QUEUE, Bundle.EMPTY)
     private val commitRadioQueueCommand = SessionCommand(ACTION_COMMIT_RADIO_QUEUE, Bundle.EMPTY)
     private val upgradeQualityCommand = SessionCommand(ACTION_UPGRADE_QUALITY, Bundle.EMPTY)
+    private val refreshSongCommand = SessionCommand(ACTION_REFRESH_SONG, Bundle.EMPTY)
     private val swapVersionCommand = SessionCommand(ACTION_SWAP_VERSION, Bundle.EMPTY)
     private val queueDragCommand = SessionCommand(ACTION_QUEUE_DRAG, Bundle.EMPTY)
 
     private var favoriteActionJob: Job? = null
+    private var refreshSongJob: Job? = null
     private var stationActionJob: Job? = null
     private var autoplayLoadJob: Job? = null
     /** Rate limit for listener-requested retries; automatic upgrades do not touch it. */
@@ -3672,6 +3676,12 @@ class PlaybackService : MediaLibraryService() {
         val item = player.currentMediaItem ?: return
         val mediaId = item.mediaId
         val uri = item.localConfiguration?.uri
+        if (refreshSongJob?.isActive == true &&
+            uri?.getQueryParameter(AudioCache.REFRESH_PARAM) != null
+        ) {
+            TrackLog.w("BitChord", "manual stream refresh failed; leaving the same queue item selected", about = mediaId)
+            return
+        }
         val position = player.currentPosition.coerceAtLeast(0L)
         val attempts = recoveries.getOrDefault(mediaId, 0) + 1
         recoveries[mediaId] = attempts
@@ -4374,6 +4384,87 @@ class PlaybackService : MediaLibraryService() {
         QualityUpgrade.askByHand(mediaId)
         TrackLog.d("BitChord", "upgrade asked for by hand for $mediaId", about = mediaId)
         lookForBetterCopy(player)
+    }
+
+    /** Re-resolves the current app-managed stream in place, without touching adjacent queue items. */
+    private fun refreshCurrentSong() {
+        val live = player ?: return
+        val item = live.currentMediaItem ?: return
+        val uri = item.localConfiguration?.uri
+        if (uri == null || uri.scheme != "bitchord") {
+            Toast.makeText(applicationContext, R.string.refresh_song_not_supported, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (refreshSongJob?.isActive == true) return
+        val index = live.currentMediaItemIndex
+        val mediaId = item.mediaId.takeIf { it.isNotBlank() } ?: return
+        if (index == C.INDEX_UNSET) return
+
+        val positionMs = live.currentPosition.coerceAtLeast(0L)
+        val resumeWhenReady = live.playWhenReady || live.isPlaying
+        val refreshNonce = SystemClock.elapsedRealtime().toString()
+        val refreshedUri = uri.buildUpon()
+            .appendQueryParameter(AudioCache.REFRESH_PARAM, refreshNonce)
+            .build()
+        val refreshedItem = item.buildUpon().setUri(refreshedUri).build()
+        val ready = CompletableDeferred<Boolean>()
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) ready.complete(true)
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                ready.complete(false)
+            }
+        }
+
+        // Stop the active reader before evicting its old cache entry. The queue
+        // itself stays intact and the same current item is reinstalled below.
+        live.playWhenReady = false
+        live.stop()
+        live.replaceMediaItem(index, refreshedItem)
+        live.seekTo(index, positionMs)
+        QualityUpgrade.forget(mediaId)
+        val videoId = uri.getQueryParameter("v")
+        StreamChoice.forget(videoId ?: mediaId)
+        videoId?.let(StreamResolver::forget)
+        SourceRegistry.clearCompletedAddonTrackCalls()
+        NerdStats.clearDeclared(mediaId)
+        live.addListener(listener)
+        Toast.makeText(applicationContext, R.string.refresh_song_started, Toast.LENGTH_SHORT).show()
+
+        refreshSongJob = scope.launch(TrackLog.about(mediaId)) {
+            try {
+                withContext(Dispatchers.IO) { AudioCache.discard(uri) }
+                val stillCurrent = withContext(Dispatchers.Main) {
+                    val current = this@PlaybackService.player ?: return@withContext false
+                    current.currentMediaItem?.localConfiguration?.uri
+                        ?.getQueryParameter(AudioCache.REFRESH_PARAM) == refreshNonce
+                }
+                if (!stillCurrent) return@launch
+                withContext(Dispatchers.Main) {
+                    val current = this@PlaybackService.player ?: return@withContext
+                    current.prepare()
+                    current.playWhenReady = resumeWhenReady || current.playWhenReady
+                }
+                val succeeded = withTimeoutOrNull(30_000L) { ready.await() } == true
+                Toast.makeText(
+                    applicationContext,
+                    if (succeeded) R.string.refresh_song_complete else R.string.refresh_song_failed,
+                    Toast.LENGTH_LONG,
+                ).show()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // Exception messages can contain a signed provider URL; keep
+                // diagnostics to the class name and show a safe generic message.
+                TrackLog.w("BitChord", "manual stream refresh failed: ${error.javaClass.simpleName}", about = mediaId)
+                Toast.makeText(applicationContext, R.string.refresh_song_failed, Toast.LENGTH_LONG).show()
+            } finally {
+                withContext(Dispatchers.Main) { live.removeListener(listener) }
+                refreshSongJob = null
+            }
+        }
     }
 
     /**
@@ -7828,6 +7919,7 @@ class PlaybackService : MediaLibraryService() {
                 .add(beginRadioQueueCommand)
                 .add(commitRadioQueueCommand)
                 .add(upgradeQualityCommand)
+                .add(refreshSongCommand)
                 .add(swapVersionCommand)
                 .add(queueDragCommand)
                 .build()
@@ -7865,6 +7957,7 @@ class PlaybackService : MediaLibraryService() {
                 ACTION_BEGIN_RADIO_QUEUE -> beginRadioQueue()
                 ACTION_COMMIT_RADIO_QUEUE -> player?.let(::saveQueueSnapshotImmediately)
                 ACTION_UPGRADE_QUALITY -> upgradeQualityNow()
+                ACTION_REFRESH_SONG -> refreshCurrentSong()
                 ACTION_SWAP_VERSION -> {
                     val bundle = args.getBundle(EXTRA_SWAP_MEDIA_ITEM)
                     if (bundle != null) {

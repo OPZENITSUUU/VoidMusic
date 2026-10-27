@@ -37,11 +37,13 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
@@ -138,6 +140,7 @@ fun SourcesScreen(
 
     /** Last known reachability per source, filled in as the probes come back. */
     val health = remember { mutableStateMapOf<String, SourceHealth>() }
+    var pendingRemoteConsent by remember { mutableStateOf<SourceConfig?>(null) }
     val losslessOutput by LosslessOutput.state.collectAsStateWithLifecycle()
 
     // Every source that has a server to reach is probed, so an addon gets a
@@ -145,10 +148,16 @@ fun SourcesScreen(
     // was any good, and the only place a manifest that fails validation gets to
     // say why. Except an addon waiting on a lossless output: it is not to be
     // contacted at all until one is connected, and connecting one re-runs this.
-    val probeKey = configs.filter { it.kind.needsServer }
+    val probeKey = configs.filter {
+        it.kind.needsServer && it.enabled &&
+            (!it.kind.isUserAdded || it.networkAccessAuthorized)
+    }
         .joinToString { "${it.id}@${it.baseUrl}@${it.checkValidLossless}" } + "@${losslessOutput.capable}"
     LaunchedEffect(probeKey) {
-        configs.filter { it.kind.needsServer && it.isComplete && !it.awaitsLosslessOutput }.forEach { config ->
+        configs.filter {
+            it.kind.needsServer && it.isComplete && it.enabled && !it.awaitsLosslessOutput &&
+                (!it.kind.isUserAdded || it.networkAccessAuthorized)
+        }.forEach { config ->
             val source = SourceRegistry.instance(config.id) ?: return@forEach
             health[config.id] = withContext(Dispatchers.IO) {
                 runCatching { source.health() }
@@ -254,7 +263,9 @@ fun SourcesScreen(
                             null
                         } else {
                             ({ enabled ->
-                                if (config.kind == SourceKind.JIOSAAVN && enabled && !config.enabled) {
+                                if (config.kind.isUserAdded && enabled && !config.networkAccessAuthorized) {
+                                    pendingRemoteConsent = config
+                                } else if (config.kind == SourceKind.JIOSAAVN && enabled && !config.enabled) {
                                     onConfirmJioSaavn()
                                 } else {
                                     SourceRegistry.setEnabled(config.id, enabled)
@@ -373,6 +384,27 @@ fun SourcesScreen(
         }
 
         Spacer(Modifier.height(32.dp))
+    }
+
+    pendingRemoteConsent?.let { config ->
+        AlertDialog(
+            onDismissRequest = { pendingRemoteConsent = null },
+            title = { Text(stringResource(R.string.addon_network_access_title)) },
+            text = { Text(stringResource(R.string.addon_network_access_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        SourceRegistry.authorizeAndEnableRemoteSource(config.id)
+                        pendingRemoteConsent = null
+                    },
+                ) { Text(stringResource(R.string.addon_network_access_allow)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRemoteConsent = null }) {
+                    Text(stringResource(R.string.not_yet))
+                }
+            },
+        )
     }
 
 }

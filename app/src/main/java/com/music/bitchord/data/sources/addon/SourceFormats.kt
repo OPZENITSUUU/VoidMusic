@@ -210,7 +210,7 @@ object SourceFormats {
     private suspend fun fetch(url: String): Result<String> = runCatching {
         val request = Request.Builder().url(url)
             .header("Accept", "application/json")
-            .header("User-Agent", "BitChord/v${com.music.bitchord.BuildConfig.VERSION_NAME}")
+            .header("User-Agent", "Void Music/v${com.music.bitchord.BuildConfig.VERSION_NAME}")
             .build()
         Http.client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
@@ -221,6 +221,6 @@ object SourceFormats {
                 ?: throw AddonException("Empty response")
         }
     }.onFailure {
-        TrackLog.d(TAG, "identify(${AddonClient.redact(url)}) failed: ${it.message}")
+        TrackLog.d(TAG, "identify(${AddonClient.redact(url)}) failed: ${it.javaClass.simpleName}")
     }
 }

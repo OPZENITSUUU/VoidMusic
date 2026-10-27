@@ -71,7 +71,7 @@ jobs:
           test -s "$apk"
           sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK path is unavailable}}"
           build_tools="$(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$build_tools/aapt" dump badging "$apk" | grep -F "package: name='com.voidmusic.player' versionCode='33' versionName='1.0.1' "
+          "$build_tools/aapt" dump badging "$apk" | grep -F "package: name='com.voidmusic.player' versionCode='34' versionName='1.0.2' "
           "$build_tools/zipalign" -c -v 4 "$apk"
           "$build_tools/apksigner" verify --verbose --print-certs "$apk"
           mkdir -p dist
@@ -90,14 +90,15 @@ jobs:
           body: |
             ## Void Music ${{ github.ref_name }}
 
-            First official Void Music Android release from the OPZENITSUUU/VoidMusic repository.
+            Follow-up Void Music Android release from the OPZENITSUUU/VoidMusic repository.
 
-            - Keeps the full music-player feature set and existing app icon.
-            - Adds the VoidMusic GitHub Releases updater with verified APK downloads.
-            - Includes the Settings “Check for Updates” control and concise update notes.
+            - Adds “Refresh Song” to re-resolve the current track and resume near its previous position.
+            - Improves addon network-consent handling, URL redaction, and LastWave search-result normalization.
+            - Enforces provider-aware disk caching and a low-storage guard.
+            - Keeps the existing music-player feature set, updater, and app icon.
 
             ## Installation and data notice
 
-            This APK uses the new Void Music signing certificate. Android cannot install it as an in-place update over legacy beta7/beta8 builds signed with a different certificate. Back up any important local app data before deciding whether to uninstall an older build. No existing app is uninstalled or overwritten by this workflow.
+            This APK uses the same signing certificate as v1.0.1 and can update that release. Android cannot install it as an in-place update over legacy beta7/beta8 builds signed with a different certificate. Back up any important local app data before deciding what to do with an older build. No existing app is uninstalled or overwritten by this workflow.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

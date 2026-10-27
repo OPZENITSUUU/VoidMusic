@@ -212,6 +212,7 @@ import com.music.bitchord.playback.toDirectYouTubeMediaItem
 import com.music.bitchord.playback.toggleAutoplay
 import com.music.bitchord.playback.toggleShuffle
 import com.music.bitchord.playback.upgradeQuality
+import com.music.bitchord.playback.refreshSong
 import com.music.bitchord.playback.revertToOriginal
 import com.music.bitchord.playback.swapToVersion
 import com.music.bitchord.playback.smart.VersionAudioAligner
@@ -4612,6 +4613,18 @@ private fun BitChordApp(
                 upgradeQualityInProgress = fromPlayer && song.videoId in qualityUpgradesInFlight,
                 onToggleAudioVersion = onToggleVersion,
                 isAudioVersion = menuIsAudioVersion,
+                onRefreshSong = if (fromPlayer &&
+                    song.localUri == null &&
+                    controller?.currentMediaItem?.mediaId == song.videoId &&
+                    controller?.currentMediaItem?.localConfiguration?.uri?.scheme == "bitchord"
+                ) {
+                    {
+                        controller?.refreshSong()
+                        songActions = null
+                    }
+                } else {
+                    null
+                },
                 // Hidden outright when there's no real YouTube id behind
                 // this row to build a link from — SongActionsSheet already
                 // drops it for a local file via `isOffline`, this catches

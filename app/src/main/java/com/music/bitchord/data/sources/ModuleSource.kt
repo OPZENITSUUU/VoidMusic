@@ -45,6 +45,11 @@ class ModuleSource(
      */
     private val manager = ModuleManager()
 
+    /** The saved consent and enabled state, read live so queued tracks cannot outlast revocation. */
+    private val live: SourceConfig get() = SourceRegistry.config(config.id) ?: config
+
+    private fun networkAccessAllowed(): Boolean = live.enabled && live.networkAccessAuthorized
+
     // ── Health ────────────────────────────────────────────────────────────
 
     override suspend fun health(): SourceHealth = withContext(Dispatchers.IO) {
@@ -60,8 +65,8 @@ class ModuleSource(
                 else -> SourceHealth.Ok("${modules.size} module${if (modules.size == 1) "" else "s"}")
             }
         } catch (e: Exception) {
-            TrackLog.w(TAG, "module index fetch failed for ${config.displayName}: ${e.message}")
-            SourceHealth.Unreachable(e.message ?: "Could not reach the module index")
+            TrackLog.w(TAG, "module index fetch failed for ${config.displayName} (${e.javaClass.simpleName})")
+            SourceHealth.Unreachable("Could not reach the module index")
         }
     }
 
@@ -105,11 +110,12 @@ class ModuleSource(
     ): List<Song> =
         withContext(Dispatchers.IO) {
             if (query.isBlank()) return@withContext emptyList()
+            if (!networkAccessAllowed()) return@withContext emptyList()
             val indexUrl = config.baseUrl
             val baseUrl = indexUrl.substringBeforeLast("/")
 
             val modules = manager.fetchIndex(indexUrl).getOrElse { e ->
-                TrackLog.w(TAG, "${config.displayName}: index fetch failed — ${e.message}")
+                TrackLog.w(TAG, "${config.displayName}: index fetch failed (${e.javaClass.simpleName})")
                 return@withContext emptyList()
             }
 
@@ -162,11 +168,11 @@ class ModuleSource(
         baseUrl: String,
     ): List<Song> {
         val loaded = manager.loadModule(module) { baseUrl }.getOrElse { e ->
-            TrackLog.w(TAG, "${config.displayName}: load failed for ${module.id} — ${e.message}")
+            TrackLog.w(TAG, "${config.displayName}: module load failed (${e.javaClass.simpleName})")
             return emptyList()
         }
         val searchResponse = manager.searchTracks(loaded, query, limit).getOrElse { e ->
-            TrackLog.w(TAG, "${config.displayName}: search failed for ${module.id} — ${e.message}")
+            TrackLog.w(TAG, "${config.displayName}: module search failed (${e.javaClass.simpleName})")
             return emptyList()
         }
         return searchResponse.tracks.map { track ->
@@ -218,10 +224,11 @@ class ModuleSource(
 
     override suspend fun stream(trackId: String, request: StreamRequest): SourceStream? =
         withContext(Dispatchers.IO) {
+            if (!networkAccessAllowed()) return@withContext null
             // trackId is "<moduleId>::<upstreamId>"
             val cut = trackId.indexOf(MOD_SEPARATOR)
             if (cut < 0) {
-                TrackLog.w(TAG, "${config.displayName}: malformed trackId '$trackId'")
+                TrackLog.w(TAG, "${config.displayName}: malformed track identifier")
                 return@withContext null
             }
             val moduleId = trackId.substring(0, cut)
@@ -230,7 +237,7 @@ class ModuleSource(
             // Find the module in the index, load it (cache hit after search),
             // then ask for the stream URL.
             val modules = manager.fetchIndex(config.baseUrl).getOrElse { e ->
-                TrackLog.w(TAG, "${config.displayName}: index fetch failed — ${e.message}")
+                TrackLog.w(TAG, "${config.displayName}: index fetch failed (${e.javaClass.simpleName})")
                 return@withContext null
             }
             val module = modules.firstOrNull { it.id == moduleId } ?: run {
@@ -239,7 +246,7 @@ class ModuleSource(
             }
             val baseUrl = config.baseUrl.substringBeforeLast("/")
             val loaded = manager.loadModule(module) { baseUrl }.getOrElse { e ->
-                TrackLog.w(TAG, "${config.displayName}: load failed for $moduleId — ${e.message}")
+                TrackLog.w(TAG, "${config.displayName}: module load failed (${e.javaClass.simpleName})")
                 return@withContext null
             }
             val streamResponse = manager.getStreamUrl(
@@ -248,18 +255,17 @@ class ModuleSource(
                 quality = request.tier,
                 settings = settingsFor(request),
             ).getOrElse { e ->
-                TrackLog.w(TAG, "${config.displayName}: getStreamUrl failed for $upstreamId — ${e.message}")
+                TrackLog.w(TAG, "${config.displayName}: stream lookup failed (${e.javaClass.simpleName})")
                 return@withContext null
             }
             val url = streamResponse.streamUrl?.ifBlank { null } ?: run {
-                TrackLog.w(TAG, "${config.displayName}: empty stream URL for $upstreamId")
+                TrackLog.w(TAG, "${config.displayName}: addon returned no stream URL")
                 return@withContext null
             }
             if (malformed(url)) {
                 TrackLog.w(
                     TAG,
-                    "${config.displayName}: $moduleId returned a malformed URL for " +
-                        "$upstreamId; skipping it — ${url.take(120)}",
+                    "${config.displayName}: module returned a malformed stream URL; skipping it",
                 )
                 return@withContext null
             }

@@ -132,7 +132,7 @@ internal object QuickJsExecutor {
         }
         evicted.forEach { runCatching { it.close() } }
 
-        TrackLog.d(TAG, "QuickJsExecutor.loadModule($moduleId) fetchBase=$fetchBase jsCodeLength=${jsCode.length}")
+        TrackLog.d(TAG, "QuickJsExecutor.loadModule($moduleId) fetchBaseSet=${fetchBase.isNotBlank()} jsCodeLength=${jsCode.length}")
         return withContext(Dispatchers.Default) {
             runCatching { newEngine(jsCode, fetchBase) }
                 .onSuccess { qjs ->
@@ -145,7 +145,7 @@ internal object QuickJsExecutor {
                     pool.free.trySend(qjs)
                     synchronized(engineLock) { pools[moduleId] = pool }
                 }
-                .onFailure { TrackLog.e(TAG, "  ✗ loadModule FAILED for $moduleId: ${it.message}", it) }
+                .onFailure { TrackLog.e(TAG, "  ✗ loadModule FAILED for $moduleId: ${it.javaClass.simpleName}") }
                 .map { }
         }
     }
@@ -232,7 +232,7 @@ internal object QuickJsExecutor {
         val pool = synchronized(engineLock) { pools[moduleId] }
             ?: return Result.failure(IllegalStateException("Module $moduleId is not loaded"))
 
-        TrackLog.d(TAG, "QuickJsExecutor.callExport($moduleId, $functionName) args=$args")
+        TrackLog.d(TAG, "QuickJsExecutor.callExport($moduleId, $functionName) argCount=${args.size} argLengths=${args.map(String::length)}")
         return withContext(Dispatchers.Default) {
             val qjs = try {
                 acquire(moduleId, pool)
@@ -289,10 +289,10 @@ internal object QuickJsExecutor {
                 )
 
                 val rawResult = qjs.evaluate<String>("__spine_resolved_json")
-                TrackLog.d(TAG, "  callExport result (${rawResult.length} chars): ${rawResult.take(500)}")
+                TrackLog.d(TAG, "  callExport result (${rawResult.length} chars)")
                 rawResult
             }.onFailure {
-                TrackLog.e(TAG, "  ✗ callExport FAILED for $moduleId.$functionName: ${it.message}", it)
+                TrackLog.e(TAG, "  ✗ callExport FAILED for $moduleId.$functionName: ${it.javaClass.simpleName}")
             }
         }
 
@@ -354,22 +354,22 @@ internal object QuickJsExecutor {
         qjs.define("console") {
             function("log", object : FunctionBinding<Unit> {
                 override fun invoke(args: Array<Any?>) {
-                    TrackLog.d(TAG, "[JS] ${args.joinToString(" ") { it?.toString() ?: "null" }}")
+                    TrackLog.d(TAG, "[JS] console.log called (${args.size} args)")
                 }
             })
             function("error", object : FunctionBinding<Unit> {
                 override fun invoke(args: Array<Any?>) {
-                    TrackLog.e(TAG, "[JS-ERR] ${args.joinToString(" ") { it?.toString() ?: "null" }}")
+                    TrackLog.e(TAG, "[JS-ERR] console.error called (${args.size} args)")
                 }
             })
             function("warn", object : FunctionBinding<Unit> {
                 override fun invoke(args: Array<Any?>) {
-                    TrackLog.w(TAG, "[JS-WARN] ${args.joinToString(" ") { it?.toString() ?: "null" }}")
+                    TrackLog.w(TAG, "[JS-WARN] console.warn called (${args.size} args)")
                 }
             })
             function("info", object : FunctionBinding<Unit> {
                 override fun invoke(args: Array<Any?>) {
-                    TrackLog.i(TAG, "[JS-INFO] ${args.joinToString(" ") { it?.toString() ?: "null" }}")
+                    TrackLog.i(TAG, "[JS-INFO] console.info called (${args.size} args)")
                 }
             })
         }

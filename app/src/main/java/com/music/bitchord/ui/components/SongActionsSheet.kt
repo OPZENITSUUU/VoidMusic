@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.PlaylistRemove
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ThumbDown
@@ -177,6 +178,8 @@ fun SongActionsSheet(
      * except the player, where "this track" means something.
      */
     onCopyLog: (() -> Unit)? = null,
+    /** Re-resolves the current player's stream without changing the queue item. */
+    onRefreshSong: (() -> Unit)? = null,
     /** Opens the timing control offered only by the main player's menu. */
     onLyricsOffset: (() -> Unit)? = null,
     /**
@@ -229,7 +232,7 @@ fun SongActionsSheet(
         // a substituted copy, the other for a track held on YouTube's own —
         // and between them they are the whole of the choice, which is why they
         // sit in the same place under the same divider.
-        if (onRollbackToOriginal != null || onUpgradeQuality != null || onToggleAudioVersion != null) {
+        if (onRollbackToOriginal != null || onUpgradeQuality != null || onToggleAudioVersion != null || onRefreshSong != null) {
             (onRollbackToOriginal ?: onUpgradeQuality)?.let {
                 ActionRow(
                     icon = if (onRollbackToOriginal != null) {
@@ -258,6 +261,14 @@ fun SongActionsSheet(
                     label = stringResource(
                         if (isAudioVersion) R.string.convert_to_video else R.string.convert_to_audio,
                     ),
+                    accent = palette.accent,
+                    onClick = it,
+                )
+            }
+            onRefreshSong?.let {
+                ActionRow(
+                    icon = Icons.Rounded.Refresh,
+                    label = stringResource(R.string.refresh_song),
                     accent = palette.accent,
                     onClick = it,
                 )

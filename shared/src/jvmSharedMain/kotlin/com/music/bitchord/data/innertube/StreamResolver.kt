@@ -280,6 +280,19 @@ object StreamResolver {
         return stream.url
     }
 
+    /**
+     * Forgets only this track's resolved URL and transient failure verdicts.
+     * The next request re-runs the normal resolver chain; account, client and
+     * unrelated-track caches remain untouched.
+     */
+    fun forget(videoId: String) {
+        recent.remove(videoId)
+        unplayable.remove(videoId)
+        loudness.remove(videoId)
+        inFlight.remove(videoId)?.cancel()
+        InnerTubeXResolver.forget(videoId)
+    }
+
     /** Per-track loudness, read once and kept for as long as the process runs. */
     private val loudness = ConcurrentHashMap<String, Double>()
 

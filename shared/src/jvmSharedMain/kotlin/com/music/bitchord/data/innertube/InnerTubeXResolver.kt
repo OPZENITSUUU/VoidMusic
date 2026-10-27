@@ -280,6 +280,12 @@ object InnerTubeXResolver {
         if (prefs != null) warm(0)
     }
 
+    /** Clears only the cached media URLs and client refusals for one video. */
+    fun forget(videoId: String) {
+        excluded.remove(videoId)
+        minted.entries.removeIf { it.value.videoId == videoId }
+    }
+
     private fun excludedFor(videoId: String): Set<String> {
         val entries = excluded[videoId] ?: return emptySet()
         val now = MonotonicClock.nowMs()

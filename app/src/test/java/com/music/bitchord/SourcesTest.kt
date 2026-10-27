@@ -621,7 +621,7 @@ class SourcesTest {
     }
 
     @Test
-    fun `requested public addon endpoints seed enabled once without bundling private token URLs`() {
+    fun `only unrelated public addon endpoints remain seeded and require consent`() {
         val initial = SourceRegistry.sourcesForInit(emptyList())
         val addons = initial.filter { it.kind == SourceKind.ADDON }
 
@@ -629,13 +629,11 @@ class SourcesTest {
             setOf(
                 "https://bluebit.jucepe0929.workers.dev",
                 "https://eljohnzc-mono.de.deplexo.com",
-                "https://losslessbridge.de.deplexo.com",
-                "https://qobuz-addon.vercel.app/a",
             ),
             addons.map { it.baseUrl }.toSet(),
         )
-        assertEquals(4, addons.size)
-        assertTrue(addons.all { it.enabled })
+        assertEquals(2, addons.size)
+        assertTrue(addons.all { !it.enabled && !it.networkAccessAuthorized })
         assertTrue(addons.all { !it.allowDownloads })
         assertTrue(addons.none { it.baseUrl.contains("gAAAA") || it.baseUrl.contains("nebula") })
 
@@ -648,6 +646,51 @@ class SourcesTest {
         )
         assertTrue(nextLaunch.none { it.baseUrl == "https://bluebit.jucepe0929.workers.dev" })
         assertTrue(nextLaunch.filter { it.kind == SourceKind.ADDON }.all { !it.enabled })
+    }
+
+    @Test
+    fun `legacy retired defaults are removed but a user-created matching URL is preserved`() {
+        val retired = listOf(
+            SourceConfig(
+                id = "default-addon-lossless-bridge-v1",
+                kind = SourceKind.ADDON,
+                baseUrl = "https://losslessbridge.de.deplexo.com",
+                enabled = true,
+            ),
+            SourceConfig(
+                id = "default-addon-qobuz-dl-v1",
+                kind = SourceKind.ADDON,
+                baseUrl = "https://qobuz-addon.vercel.app/a",
+                enabled = true,
+            ),
+        )
+        val userEntry = SourceConfig(
+            id = "user-added-qobuz",
+            kind = SourceKind.ADDON,
+            baseUrl = "https://qobuz-addon.vercel.app/a",
+            enabled = true,
+            networkAccessAuthorized = true,
+        )
+
+        val migrated = SourceRegistry.sourcesForInit(retired + userEntry, seedDefaultAddons = false)
+
+        assertTrue(migrated.none { it.id in setOf("default-addon-lossless-bridge-v1", "default-addon-qobuz-dl-v1") })
+        assertTrue(migrated.any { it.id == "user-added-qobuz" && it.enabled })
+    }
+
+    @Test
+    fun `legacy enabled addons are disabled until the user grants network consent`() {
+        val legacy = SourceConfig(
+            id = "legacy-addon",
+            kind = SourceKind.ADDON,
+            baseUrl = "https://addon.example",
+            enabled = true,
+        )
+
+        val migrated = SourceRegistry.sourcesForInit(listOf(legacy), seedDefaultAddons = false)
+
+        assertFalse(migrated.single { it.id == legacy.id }.enabled)
+        assertFalse(migrated.single { it.id == legacy.id }.networkAccessAuthorized)
     }
 
     @Test
@@ -680,6 +723,7 @@ class SourcesTest {
             kind = SourceKind.ADDON,
             baseUrl = "https://enabled.example",
             enabled = true,
+            networkAccessAuthorized = true,
         )
         val youtube = SourceConfig(kind = SourceKind.YOUTUBE)
 
@@ -688,6 +732,18 @@ class SourcesTest {
         )
 
         assertEquals(listOf(enabledAddon.id, youtube.id), enabled.map { it.id })
+    }
+
+    @Test
+    fun `an enabled addon without explicit consent is excluded from source walks`() {
+        val unauthorized = SourceConfig(
+            kind = SourceKind.ADDON,
+            baseUrl = "https://unapproved.example",
+            enabled = true,
+            networkAccessAuthorized = false,
+        )
+
+        assertTrue(SourceRegistry.enabledConfigs(listOf(unauthorized)).isEmpty())
     }
 
     @Test

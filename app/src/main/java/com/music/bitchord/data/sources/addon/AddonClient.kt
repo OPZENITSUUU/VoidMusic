@@ -95,7 +95,7 @@ class AddonClient(rawBaseUrl: String) {
             }
             if (!manifest.isPlayable) {
                 val declared = manifest.resources.joinToString(", ")
-                throw AddonException("This addon declares $declared — BitChord needs search")
+                throw AddonException("This addon declares $declared — Void Music needs search")
             }
             manifest
         }.recoverCatching { failure ->
@@ -146,7 +146,7 @@ class AddonClient(rawBaseUrl: String) {
             // and an addon whose catalogue differs by tier would otherwise
             // answer the second one with the first one's rows.
             key = keyOf(trimmed, params.toString()),
-            describe = { "▶ addon search(${redact(baseUrl)}) q=\"$trimmed\" tier=$tier" },
+            describe = { "▶ addon search(${redact(baseUrl)}) queryChars=${trimmed.length} tier=$tier" },
         ) {
             fetch<AddonSearchResponse>(endpoint(listOf("search"), params + ("q" to trimmed)))
         }.map { it.tracks }
@@ -171,7 +171,7 @@ class AddonClient(rawBaseUrl: String) {
         val params = settingsFor(tier, stereoOnly)
         return streams.get(
             key = keyOf(trackId, params.toString()),
-            describe = { "▶ addon stream(${redact(baseUrl)}) id=$trackId tier=$tier" },
+            describe = { "▶ addon stream(${redact(baseUrl)}) tier=$tier" },
         ) {
             fetch<AddonStream>(endpoint(listOf("stream", trackId), params))
         }
@@ -316,7 +316,7 @@ class AddonClient(rawBaseUrl: String) {
                 // A miss is not worth a line. Everything else is: this is the
                 // only place that knows why an addon didn't answer.
                 if (failure !is AddonNotFound) {
-                    TrackLog.w(TAG, "  ✗ addon call failed ${redact(url)}: ${failure.message}")
+                    TrackLog.w(TAG, "  ✗ addon call failed ${redact(url)}: ${failure.javaClass.simpleName}")
                 }
             }
 
@@ -361,7 +361,7 @@ class AddonClient(rawBaseUrl: String) {
                     // sends people to re-paste a URL that was always correct.
                     response.code >= 500 -> throw AddonUnavailable(httpFailure(response))
                     response.code != 429 -> throw AddonException(httpFailure(response))
-                    attempt >= MAX_RETRIES -> throw AddonUnavailable("This addon is rate limiting BitChord")
+                    attempt >= MAX_RETRIES -> throw AddonUnavailable("This addon is rate limiting Void Music")
                     else -> retryAfterMs(response.header("Retry-After"), attempt)
                 }
             }
@@ -423,12 +423,7 @@ class AddonClient(rawBaseUrl: String) {
             val payload = json.parseToJsonElement(response.peekBody(MAX_ERROR_BODY_BYTES).string()) as? JsonObject
             payload?.get("error")?.jsonPrimitive?.contentOrNull
         }.getOrNull()
-            ?.replace(Regex("https?://[^\\s\\\"']+"), "[URL redacted]")
-            ?.replace(Regex("(?i)(token|secret|authorization|api[_-]?key)(\\s*[:=]\\s*)[^\\s,;\\\"]+"), "$1$2[redacted]")
-            ?.replace(Regex("\\b[A-Za-z0-9_-]{40,}\\b"), "[opaque value redacted]")
-            ?.replace(Regex("[\\r\\n\\t]+"), " ")
-            ?.trim()
-            ?.take(MAX_ERROR_DETAIL_CHARS)
+            ?.let(::redactErrorDetail)
             ?.takeIf { it.isNotBlank() }
         return detail?.let { "HTTP ${response.code}: $it" } ?: "HTTP ${response.code}"
     }
@@ -544,6 +539,15 @@ class AddonClient(rawBaseUrl: String) {
         fun redact(url: String): String =
             url.toHttpUrlOrNull()?.let { "${it.scheme}://${it.host}/***" } ?: "***"
 
+        /** Hides signed URLs and credential-like text in addon-supplied error messages. */
+        fun redactErrorDetail(value: String): String = value
+            .replace(Regex("https?://[^\\s\\\"']+"), "[URL redacted]")
+            .replace(Regex("(?i)(token|secret|authorization|api[_-]?key)(\\s*[:=]\\s*)[^\\s,;\\\"]+"), "$1$2[redacted]")
+            .replace(Regex("\\b[A-Za-z0-9_-]{40,}\\b"), "[opaque value redacted]")
+            .replace(Regex("[\\r\\n\\t]+"), " ")
+            .trim()
+            .take(MAX_ERROR_DETAIL_CHARS)
+
         /**
          * How long a manifest is trusted.
          *
@@ -571,7 +575,7 @@ class AddonClient(rawBaseUrl: String) {
         private const val BACKOFF_BASE_MS = 500L
         private const val BACKOFF_CAP_MS = 8_000L
 
-        private val USER_AGENT = "BitChord/v${com.music.bitchord.BuildConfig.VERSION_NAME}"
+        private val USER_AGENT = "Void Music/v${com.music.bitchord.BuildConfig.VERSION_NAME}"
 
         /**
          * What [probeSearch] asks for. Deliberately an ordinary word rather

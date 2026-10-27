@@ -110,6 +110,17 @@ class AddonSourceTest {
         assertEquals("***", AddonClient.redact("not a url"))
     }
 
+    @Test
+    fun `addon error details hide signed URLs and credential-like values`() {
+        val safe = AddonClient.redactErrorDetail(
+            "failed https://cdn.example/track.flac?token=signed-value api_key=private-value",
+        )
+
+        assertFalse(safe.contains("signed-value"))
+        assertFalse(safe.contains("private-value"))
+        assertTrue(safe.contains("[URL redacted]"))
+    }
+
     // ── Manifest ──────────────────────────────────────────────────────────
 
     @Test
@@ -276,6 +287,53 @@ class AddonSourceTest {
         val songs = AddonSource(config()).search("x", limit = 10)
         assertEquals(1, songs.size)
         assertEquals("Fine", songs[0].title)
+    }
+
+    @Test
+    fun `LastWave normalizes its result and stream dialect without accepting the synthetic fallback`() = runBlocking {
+        route(
+            "/manifest.json",
+            json(
+                """{"id":"com.lastwave.addon","name":"LastWave","version":"1.0.0","resources":["search","stream","settings"],"settings":[{"key":"quality","type":"select","default":"high","options":[{"value":"lossless"},{"value":"atmos"},{"value":"high"},{"value":"low"}]}]}""",
+            ),
+        )
+        route(
+            "/search",
+            json(
+                """{"tracks":[{"id":"lw-1","title":"Night Song","artist":"Artist","album":"Album","duration":213,"format":"FLAC","quality":"lossless","audioQuality":"FLAC","audioModes":["STEREO"]},{"id":"swap_fallback","title":"No match","artist":"","album":"Single","quality":"lossless"}]}""",
+            ),
+        )
+        route(
+            "/stream/lw-1",
+            json(
+                """{"streamUrl":"https://media.lastwave.example/audio.flac","codec":"flac","quality":"lossless","sampleRate":44100,"bitDepth":16,"bitrate":1411200,"encrypted":false}""",
+            ),
+        )
+
+        val source = AddonSource(config())
+        val songs = source.search("Night Song", limit = 5)
+        val stream = source.stream("lw-1", StreamRequest.Lossless)
+
+        assertEquals(listOf("Night Song"), songs.map { it.title })
+        assertEquals("LOSSLESS", songs.single().sourceQuality)
+        assertFalse(songs.single().sourceHiRes)
+        assertEquals("https://media.lastwave.example/audio.flac", stream?.url)
+        assertEquals("flac", stream?.format?.codec)
+        assertEquals(44_100, stream?.format?.sampleRateHz)
+        assertEquals(16, stream?.format?.bitDepth)
+        assertEquals(1411, stream?.format?.kbps)
+        assertEquals("lossless", requestFor("/search").queryParameter("quality"))
+        assertEquals("lossless", requestFor("/stream/lw-1").queryParameter("quality"))
+    }
+
+    @Test
+    fun `an addon with no explicit consent cannot receive searches or stream lookups`() = runBlocking {
+        val unapproved = config().copy(enabled = false, networkAccessAuthorized = false)
+        val source = AddonSource(unapproved)
+
+        assertTrue(source.search("private search", limit = 5).isEmpty())
+        assertNull(source.stream("private-track-id", StreamRequest.Lossless))
+        assertTrue(synchronized(seen) { seen.isEmpty() })
     }
 
     @Test
@@ -1181,6 +1239,8 @@ class AddonSourceTest {
     private fun config() = SourceConfig(
         kind = SourceKind.ADDON,
         baseUrl = server.url("/").toString().trimEnd('/'),
+        enabled = true,
+        networkAccessAuthorized = true,
     )
 
     private fun source() = AddonSource(config())

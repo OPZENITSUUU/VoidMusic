@@ -152,6 +152,8 @@ data class AddonTrack(
     @SerialName("format") val format: String = "",
     /** Not in the spec, but several addons send it and it says the same thing. */
     @SerialName("audioQuality") val audioQuality: String = "",
+    /** LastWave and compatible services may call the displayed tier `quality`. */
+    @SerialName("quality") val quality: String = "",
     /**
      * How the recording is mixed, when the catalogue distinguishes: `STEREO`,
      * `DOLBY_ATMOS`, `SONY_360RA`. Read because for at least one backend it is
@@ -199,7 +201,7 @@ data class AddonTrack(
         )
 
     /** Whether the row names the hi-res tier — Tidal's `HI_RES_LOSSLESS`, `hires-96`, `24-bit`. */
-    val isHiRes: Boolean get() = HI_RES_HINT.containsMatchIn("$audioQuality $format")
+    val isHiRes: Boolean get() = HI_RES_HINT.containsMatchIn("$audioQuality $quality $format")
 }
 
 /** How a row spells the hi-res lossless tier in its quality label. */
@@ -235,6 +237,11 @@ private val ATMOS_HINT = Regex("""atmos|dolby|eac3[_-]?joc|ec-?3""", RegexOption
 @Serializable
 data class AddonStream(
     @SerialName("url") val url: String = "",
+    /** URL aliases used by LastWave; its adapter promotes one to [url]. */
+    @SerialName("streamUrl") val streamUrl: String? = null,
+    @SerialName("directUrl") val directUrl: String? = null,
+    @SerialName("downloadUrl") val downloadUrl: String? = null,
+    @SerialName("mediaUrl") val mediaUrl: String? = null,
     /** Free text: `mp3`, `flac`, `dash`. Describes the audio, not the transport. */
     @SerialName("format") val format: String = "",
     @SerialName("quality") val quality: String = "",

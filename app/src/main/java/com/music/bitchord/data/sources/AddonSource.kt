@@ -9,6 +9,7 @@ import com.music.bitchord.data.sources.addon.AddonManifest
 import com.music.bitchord.data.sources.addon.AddonNotFound
 import com.music.bitchord.data.sources.addon.AddonStream
 import com.music.bitchord.data.sources.addon.AddonTrack
+import com.music.bitchord.data.sources.addon.LastWaveAdapter
 import com.music.bitchord.playback.StreamContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -85,9 +86,10 @@ class AddonSource(
      * which the request was about to read for its settings anyway.
      */
     private suspend fun admitted(what: String): Boolean {
+        if (!live.enabled || !live.networkAccessAuthorized) return false
         if (shutOut(what)) return false
         client.manifest().getOrNull()?.let(::recordPolicy)
-        return !shutOut(what)
+        return live.enabled && live.networkAccessAuthorized && !shutOut(what)
     }
 
     private fun recordPolicy(manifest: AddonManifest) =
@@ -133,7 +135,7 @@ class AddonSource(
                     TrackLog.d(TAG, "${config.displayName}: no manifest, but search answers")
                     return@fold SourceHealth.Ok("No manifest · search works")
                 }
-                val reason = failure.message ?: "Could not reach the addon"
+                val reason = AddonClient.redactErrorDetail(failure.message ?: "Could not reach the addon")
                 if (failure is AddonException) {
                     SourceHealth.Rejected(reason)
                 } else {
@@ -157,7 +159,11 @@ class AddonSource(
      * this reads what the probe already fetched.
      */
     suspend fun manifestName(): String? =
-        if (shutOut("its name")) null else client.manifest().getOrNull()?.displayName?.ifBlank { null }
+        if (!live.enabled || !live.networkAccessAuthorized || shutOut("its name")) {
+            null
+        } else {
+            client.manifest().getOrNull()?.displayName?.ifBlank { null }
+        }
 
     // ── Search ────────────────────────────────────────────────────────────
 
@@ -193,10 +199,15 @@ class AddonSource(
             if (!admitted("a search")) return@withContext emptyList()
             val tier = request?.tier ?: AddonClient.TIER_LOSSLESS
             val tracks = client.search(query, tier).getOrElse { failure ->
-                TrackLog.w(TAG, "${config.displayName}: search failed — ${failure.message}")
+                TrackLog.w(TAG, "${config.displayName}: search failed — ${AddonClient.redactErrorDetail(failure.message.orEmpty())}")
                 return@withContext emptyList()
             }
-            tracks.asSequence()
+            val normalizedTracks = if (LastWaveAdapter.supports(client.manifest().getOrNull())) {
+                LastWaveAdapter.normalizeTracks(tracks)
+            } else {
+                tracks
+            }
+            normalizedTracks.asSequence()
                 .filter { it.id.isNotBlank() && it.title.isNotBlank() }
                 .take(limit)
                 .map { track ->
@@ -219,7 +230,7 @@ class AddonSource(
                         sourceQuality = if (track.isDolbyAtmos) {
                             ModuleSource.DOLBY
                         } else {
-                            ModuleSource.qualityTier("${track.audioQuality} ${track.format}")
+                            ModuleSource.qualityTier("${track.audioQuality} ${track.quality} ${track.format}")
                         },
                         sourceHiRes = !track.isDolbyAtmos && track.isHiRes,
                     )
@@ -246,7 +257,12 @@ class AddonSource(
             if (!admitted("a stream")) return@withContext null
             val tier = request.tier
             val result = client.stream(trackId, tier, stereoOnly)
-            val answer = result.getOrNull()
+            val rawAnswer = result.getOrNull()
+            val answer = if (LastWaveAdapter.supports(client.manifest().getOrNull())) {
+                rawAnswer?.let(LastWaveAdapter::normalizeStream)
+            } else {
+                rawAnswer
+            }
 
             if (answer == null) {
                 // A 404 is the addon saying it does not hold this recording,
@@ -255,7 +271,11 @@ class AddonSource(
                 // search row had, else null so [SourceResolver] moves on.
                 val failure = result.exceptionOrNull()
                 if (failure !is AddonNotFound) {
-                    TrackLog.w(TAG, "${config.displayName}: stream failed for $trackId — ${failure?.message}")
+                    TrackLog.w(
+                        TAG,
+                        "${config.displayName}: stream request failed — " +
+                            AddonClient.redactErrorDetail(failure?.message.orEmpty()),
+                    )
                 }
                 return@withContext fromRow(trackId, tier)
             }
@@ -268,8 +288,10 @@ class AddonSource(
                 // ever actionable if it is said out loud here.
                 TrackLog.w(
                     TAG,
-                    "${config.displayName}: no stream for $trackId" +
-                        (answer.error?.ifBlank { null }?.let { " — $it" } ?: ""),
+                    "${config.displayName}: no stream" +
+                        (answer.error?.ifBlank { null }
+                            ?.let { AddonClient.redactErrorDetail(it) }
+                            ?.let { " — $it" } ?: ""),
                 )
                 return@withContext fromRow(trackId, tier)
             }
@@ -278,7 +300,7 @@ class AddonSource(
                 if (stereoOnly && stream?.format?.isDolbyAtmos == true) {
                     TrackLog.w(
                         TAG,
-                        "${config.displayName}: asked for the stereo mix of $trackId with no Atmos hint " +
+                        "${config.displayName}: asked for the stereo mix with no Atmos hint " +
                             "and was sent Atmos anyway",
                     )
                 }
@@ -299,7 +321,7 @@ class AddonSource(
     private fun fromRow(trackId: String, tier: String): SourceStream? {
         val row = rows[trackId] ?: return null
         val url = row.streamURL?.ifBlank { null } ?: return null
-        TrackLog.d(TAG, "${config.displayName}: using the search row's own URL for $trackId")
+        TrackLog.d(TAG, "${config.displayName}: using a stream URL supplied in its search row")
         return openable(url, AddonStream(url = url, format = row.format), trackId, tier)
     }
 
@@ -324,18 +346,18 @@ class AddonSource(
         if (ModuleSource.malformed(url)) {
             TrackLog.w(
                 TAG,
-                "${config.displayName}: malformed URL for $trackId; skipping it — ${url.take(120)}",
+                "${config.displayName}: malformed stream URL; skipping it",
             )
             return null
         }
         if (!AddonClient.isSecureUrl(url)) {
-            TrackLog.w(TAG, "${config.displayName}: refusing a non-HTTPS stream URL for $trackId")
+            TrackLog.w(TAG, "${config.displayName}: refusing a non-HTTPS stream URL")
             return null
         }
         if (answer.isEncrypted) {
             TrackLog.w(
                 TAG,
-                "${config.displayName}: $trackId came back encrypted, which BitChord never asked for — passing",
+                "${config.displayName}: the stream came back encrypted, which Void Music never asked for — passing",
             )
             return null
         }

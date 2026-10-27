@@ -71,8 +71,8 @@ enum class SourceKind(
      */
     ADDON(
         label = "Addon",
-        detail = "An addon server you host or were given a link to. Searched and streamed over " +
-            "plain HTTP — no code is downloaded or run.",
+        detail = "An addon server you host or were given a link to. Requests use HTTPS; " +
+            "no code is downloaded or run.",
         labels = listOf("FLAC", "Lossless", "Hi-Res"),
         needsServer = true,
         canServeLossless = true,

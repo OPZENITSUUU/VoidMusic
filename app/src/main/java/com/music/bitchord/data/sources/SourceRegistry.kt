@@ -36,14 +36,17 @@ data class SourceConfig(
     /** What the user called it. Blank falls back to the server's host, or the kind's own label. */
     val label: String = "",
     val baseUrl: String = "",
-    /** JioSaavn and Commons are opt-in; YouTube remains enabled by default. */
-    val enabled: Boolean = kind != SourceKind.JIOSAAVN && kind != SourceKind.WIKIMEDIA_COMMONS,
+    /** Addons, JioSaavn and Commons are opt-in; YouTube remains enabled by default. */
+    val enabled: Boolean = kind != SourceKind.JIOSAAVN &&
+        kind != SourceKind.WIKIMEDIA_COMMONS && !kind.isUserAdded,
+    /** True only after the user explicitly allowed this server to receive searches and track IDs. */
+    val networkAccessAuthorized: Boolean = false,
     /**
      * The addon's `allowDownloads`, as its manifest last said. Stored rather
      * than asked each time so the answer is there without a request — see
      * [checkValidLossless] for why that matters.
      */
-    val allowDownloads: Boolean = true,
+    val allowDownloads: Boolean = kind != SourceKind.MODULE && kind != SourceKind.CUSTOM_MODULE,
     /**
      * The addon's `checkValidLossless`, as its manifest last said. Has to be
      * stored: the promise is that a gated addon is not contacted at all while
@@ -138,8 +141,9 @@ object SourceRegistry {
         // built-in kind picks it up for existing installs too. Commons remains
         // opt-in; YouTube is on. JioSaavn is retired. User-requested add-ons are
         // seeded once and then their stored on/off/removal choice is respected.
-        val withBuiltIns = stored + BUILT_IN_KINDS
-            .filter { kind -> stored.none { it.kind == kind } }
+        val withoutRetiredAddons = stored.filterNot { it.id in RETIRED_DEFAULT_ADDON_IDS }
+        val withBuiltIns = withoutRetiredAddons + BUILT_IN_KINDS
+            .filter { kind -> withoutRetiredAddons.none { it.kind == kind } }
             .map { SourceConfig(kind = it) }
         val seeded = if (!seedDefaultAddons) {
             withBuiltIns
@@ -158,6 +162,8 @@ object SourceRegistry {
             .map { config ->
                 when {
                     config.kind == SourceKind.YOUTUBE && !config.enabled -> config.copy(enabled = true)
+                    config.kind.isUserAdded && config.enabled && !config.networkAccessAuthorized ->
+                        config.copy(enabled = false)
                     else -> config
                 }
             }
@@ -230,7 +236,10 @@ object SourceRegistry {
 
     /** The common eligibility gate used by playback and download source walks. */
     internal fun enabledConfigs(configs: List<SourceConfig>): List<SourceConfig> =
-        configs.filter { it.enabled && it.isComplete }
+        configs.filter {
+            it.enabled && it.isComplete &&
+            (!it.kind.isUserAdded || it.networkAccessAuthorized)
+        }
 
     /**
      * [active], minus the sources the ceiling on the connection in hand does
@@ -271,12 +280,32 @@ object SourceRegistry {
 
     // ── Editing ─────────────────────────────────────────────────────────
 
-    fun add(config: SourceConfig) = publish(configs.value + config.tidied())
-
-    fun update(config: SourceConfig) =
-        config.tidied().let { tidied ->
-            publish(configs.value.map { if (it.id == tidied.id) tidied else it })
+    fun add(config: SourceConfig) {
+        val candidate = config.tidied()
+        val safe = if (candidate.kind.isUserAdded) {
+            candidate.copy(enabled = false, networkAccessAuthorized = false)
+        } else {
+            candidate
         }
+        publish(configs.value + safe)
+    }
+
+    fun update(config: SourceConfig) {
+        val candidate = config.tidied()
+        val existing = this.config(candidate.id)
+        val consentStillApplies = existing?.kind?.isUserAdded == true &&
+            existing.networkAccessAuthorized &&
+            canonicalUrl(existing.baseUrl) == canonicalUrl(candidate.baseUrl)
+        val safe = if (candidate.kind.isUserAdded) {
+            candidate.copy(
+                networkAccessAuthorized = consentStillApplies,
+                enabled = candidate.enabled && consentStillApplies,
+            )
+        } else {
+            candidate
+        }
+        publish(configs.value.map { if (it.id == safe.id) safe else it })
+    }
 
     /**
      * The config as it should be stored, rather than as it was typed.
@@ -310,8 +339,21 @@ object SourceRegistry {
      * see [SourcesScreen][com.music.bitchord.ui.screens.SourcesScreen].
      */
     fun setEnabled(configId: String, enabled: Boolean) {
-        if (!enabled && config(configId)?.kind == SourceKind.YOUTUBE) return
+        val target = config(configId) ?: return
+        if (!enabled && target.kind == SourceKind.YOUTUBE) return
+        if (enabled && target.kind.isUserAdded && !target.networkAccessAuthorized) return
         publish(configs.value.map { if (it.id == configId) it.copy(enabled = enabled) else it })
+    }
+
+    /** Grants explicit network consent for exactly this saved addon, then enables it. */
+    fun authorizeAndEnableRemoteSource(configId: String) {
+        val target = config(configId) ?: return
+        if (!target.kind.isUserAdded || !target.isComplete) return
+        publish(
+            configs.value.map {
+                if (it.id == configId) it.copy(enabled = true, networkAccessAuthorized = true) else it
+            },
+        )
     }
 
     /**
@@ -511,13 +553,19 @@ object SourceRegistry {
     private val BUILT_IN_KINDS = listOf(SourceKind.WIKIMEDIA_COMMONS, SourceKind.YOUTUBE)
 
     /** Public endpoints requested by the user. Credential-bearing paths are never bundled in an APK. */
+    private val RETIRED_DEFAULT_ADDON_IDS = setOf(
+        "default-addon-lossless-bridge-v1",
+        "default-addon-qobuz-dl-v1",
+    )
+
     private val DEFAULT_ADDONS = listOf(
         SourceConfig(
             id = "default-addon-bluebit-v1",
             kind = SourceKind.ADDON,
             label = "BlueBit Station",
             baseUrl = "https://bluebit.jucepe0929.workers.dev",
-            enabled = true,
+            enabled = false,
+            networkAccessAuthorized = false,
             allowDownloads = false,
         ),
         SourceConfig(
@@ -525,23 +573,8 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "Eljohnzc Mono",
             baseUrl = "https://eljohnzc-mono.de.deplexo.com",
-            enabled = true,
-            allowDownloads = false,
-        ),
-        SourceConfig(
-            id = "default-addon-lossless-bridge-v1",
-            kind = SourceKind.ADDON,
-            label = "Lossless Bridge",
-            baseUrl = "https://losslessbridge.de.deplexo.com",
-            enabled = true,
-            allowDownloads = false,
-        ),
-        SourceConfig(
-            id = "default-addon-qobuz-dl-v1",
-            kind = SourceKind.ADDON,
-            label = "Qobuz-DL",
-            baseUrl = "https://qobuz-addon.vercel.app/a",
-            enabled = true,
+            enabled = false,
+            networkAccessAuthorized = false,
             allowDownloads = false,
         ),
     )

@@ -16,7 +16,7 @@
     <string name="settings_category_language_subtitle">App language and lyrics translation</string>
     <string name="settings_category_more_title">More settings</string>
     <string name="settings_category_more_subtitle">Queue behavior and advanced options</string>
-    <string name="settings_made_by">Made by OPZENITSU69</string>
+    <string name="settings_made_by">Made by Void Music</string>
     <string name="automatic_best_source_title">Automatic best source</string>
     <string name="automatic_best_source_subtitle">Compare enabled sources and choose the best reported codec and bitrate for each song</string>
     <string name="hide_from_home">Hide from Home</string>
@@ -34,7 +34,7 @@
     <string name="csv_import_succeeded">Imported %1$s monthly records from CSV</string>
     <string name="csv_export_succeeded">Exported %1$s monthly records to CSV</string>
     <string name="import_listening_csv">Import listening history from CSV</string>
-    <string name="import_listening_csv_subtitle">Restore monthly listening totals from an OPZENITSU69 CSV export</string>
+    <string name="import_listening_csv_subtitle">Restore monthly listening totals from an Void Music CSV export</string>
     <string name="csv_import_warning">This replaces listening history on this device. Settings are not included in a CSV file.</string>
     <string name="csv_choose_file">Choose CSV file</string>
 </resources>

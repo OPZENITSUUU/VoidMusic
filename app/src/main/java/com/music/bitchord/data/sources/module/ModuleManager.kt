@@ -20,13 +20,13 @@ import okhttp3.Request
  * These URLs point at the module index the build secret supplies —
  * [SourceRegistry][com.music.bitchord.data.sources.SourceRegistry] never
  * shows it on screen (see the sources settings screen), so debug logcat
- * shouldn't hand it out either. Only the host is sensitive; the path is kept
- * so a fetch failure or cache hit is still traceable to which endpoint it was.
+ * shouldn't hand it out either. Credentials may live in the path or query, so
+ * neither is retained in diagnostics.
  */
 internal fun redactModuleUrl(url: String): String =
     runCatching {
         val uri = java.net.URI(url)
-        "${uri.scheme}://***${uri.rawPath.orEmpty()}"
+        "${uri.scheme}://${uri.host ?: "***"}/***"
     }.getOrDefault("***")
 
 /**
@@ -145,7 +145,7 @@ class ModuleManager {
                 }.onSuccess {
                     indexCache[sourceUrl] = CachedIndex(it, System.currentTimeMillis())
                 }.onFailure {
-                    TrackLog.e(TAG, "  ✗ fetchIndex FAILED for ${redactModuleUrl(sourceUrl)}: ${it.message}", it)
+                    TrackLog.e(TAG, "  ✗ fetchIndex FAILED for ${redactModuleUrl(sourceUrl)}: ${it.javaClass.simpleName}")
                 }
             }
         }
@@ -205,7 +205,7 @@ class ModuleManager {
             loadedModules.remove(module.id)
         }
 
-        TrackLog.d(TAG, "▶ loadModule(${module.id}) download=${module.download}")
+        TrackLog.d(TAG, "▶ loadModule(${module.id}) downloadSet=${module.download.isNotBlank()}")
         runCatching {
             val downloadUrl = if (module.download.startsWith("http")) {
                 module.download
@@ -231,7 +231,7 @@ class ModuleManager {
             TrackLog.d(TAG, "  ✓ Loaded module ${module.id}: ${jsCode.length} chars, baseUrl=${redactModuleUrl(baseUrl)}")
             loaded
         }.onFailure {
-            TrackLog.e(TAG, "  ✗ loadModule FAILED for ${module.id}: ${it.message}", it)
+            TrackLog.e(TAG, "  ✗ loadModule FAILED for ${module.id}: ${it.javaClass.simpleName}")
         }
     }
 
@@ -248,7 +248,7 @@ class ModuleManager {
         // query does: the same search under a different quality tier is a
         // different question.
         key = keyOf(loaded.module.id, query, limit.toString(), contextArg(settings)),
-        describe = { "▶ searchTracks() module=${loaded.module.id} query=\"$query\" limit=$limit" },
+        describe = { "▶ searchTracks() module=${loaded.module.id} queryChars=${query.length} limit=$limit" },
     ) {
         searchTracksNow(loaded, query, limit, settings)
     }
@@ -260,7 +260,7 @@ class ModuleManager {
         settings: Map<String, String>,
     ): Result<ModuleSearchResponse> = withContext(Dispatchers.IO) {
         val contextArg = contextArg(settings)
-        TrackLog.d(TAG, "▶ searchTracks() module=${loaded.module.id} query=\"$query\" limit=$limit")
+        TrackLog.d(TAG, "▶ searchTracks() module=${loaded.module.id} queryChars=${query.length} limit=$limit")
         runCatching {
             val result = QuickJsExecutor.callExport(
                 moduleId = loaded.module.id,
@@ -271,7 +271,7 @@ class ModuleManager {
                 TrackLog.d(TAG, "  ✓ Parsed ${it.tracks.size} tracks (total=${it.total})")
             }
         }.onCancellation().onFailure {
-            TrackLog.e(TAG, "  ✗ searchTracks FAILED for ${loaded.module.id} query='$query': ${it.message}", it)
+            TrackLog.e(TAG, "  ✗ searchTracks FAILED for ${loaded.module.id}: ${it.javaClass.simpleName}")
         }
     }
 
@@ -294,7 +294,7 @@ class ModuleManager {
         settings: Map<String, String> = emptyMap(),
     ): Result<ModuleStreamResponse> = streams.get(
         key = keyOf(loaded.module.id, trackId, quality, contextArg(settings)),
-        describe = { "▶ getStreamUrl() module=${loaded.module.id} trackId=$trackId quality=$quality" },
+        describe = { "▶ getStreamUrl() module=${loaded.module.id} quality=$quality" },
     ) {
         getStreamUrlNow(loaded, trackId, quality, settings)
     }
@@ -306,7 +306,7 @@ class ModuleManager {
         settings: Map<String, String>,
     ): Result<ModuleStreamResponse> = withContext(Dispatchers.IO) {
         val contextArg = contextArg(settings)
-        TrackLog.d(TAG, "▶ getStreamUrl() module=${loaded.module.id} trackId=$trackId quality=$quality")
+        TrackLog.d(TAG, "▶ getStreamUrl() module=${loaded.module.id} quality=$quality")
         runCatching {
             val result = QuickJsExecutor.callExport(
                 moduleId = loaded.module.id,
@@ -314,10 +314,14 @@ class ModuleManager {
                 args = listOf("\"$trackId\"", "\"$quality\"", contextArg),
             ).getOrThrow()
             json.decodeFromString<ModuleStreamResponse>(result).also {
-                TrackLog.d(TAG, "  ✓ streamUrl=${it.streamUrl?.take(100) ?: "<none>"} quality=${it.track?.audioQuality}")
+                TrackLog.d(
+                    TAG,
+                    "  ✓ stream resolved=${!it.streamUrl.isNullOrBlank()} urlChars=${it.streamUrl?.length ?: 0} " +
+                        "quality=${it.track?.audioQuality}",
+                )
             }
         }.onCancellation().onFailure {
-            TrackLog.e(TAG, "  ✗ getStreamUrl FAILED for ${loaded.module.id} trackId=$trackId: ${it.message}", it)
+            TrackLog.e(TAG, "  ✗ getStreamUrl FAILED for ${loaded.module.id}: ${it.javaClass.simpleName}")
         }
     }
 
