@@ -42,13 +42,46 @@ jobs:
           set -euo pipefail
           umask 077
           for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
-            if [[ -z "${!name}" ]]; then
-              echo "::error::Missing required repository secret: $name"
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required Actions secret is missing or empty: $name"
               exit 1
             fi
+            echo "Required Actions secret is present: $name"
           done
+
+          if ! printf '%s' "$KEYSTORE_BASE64" | base64 --decode > voidmusic-release.jks; then
+            echo "::error::KEYSTORE_BASE64 is not valid base64"
+            exit 1
+          fi
+          if [[ ! -s voidmusic-release.jks ]] || ! keytool -list -keystore voidmusic-release.jks \
+            -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Decoded keystore, KEYSTORE_PASSWORD, or KEY_ALIAS is invalid"
+            exit 1
+          fi
+
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          printf 'signing validation\n' > "$temp_dir/payload.txt"
+          jar cf "$temp_dir/unsigned.jar" -C "$temp_dir" payload.txt >/dev/null
+          if ! jarsigner -keystore voidmusic-release.jks -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" -signedjar "$temp_dir/signed.jar" \
+            "$temp_dir/unsigned.jar" "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::KEY_PASSWORD does not unlock the configured signing alias"
+            exit 1
+          fi
+          jarsigner -verify "$temp_dir/signed.jar" >/dev/null
+
+          keytool -exportcert -alias "$KEY_ALIAS" -keystore voidmusic-release.jks \
+            -storepass "$KEYSTORE_PASSWORD" -file "$temp_dir/certificate.der" >/dev/null 2>&1
+          certificate_sha256="$(sha256sum "$temp_dir/certificate.der" | awk '{print toupper($1)}')"
+          expected_sha256="4D70AD0DEC72160984BCC04FAD9FC8CC433B275DCC2BBED2918282AEF7E23A6B"
+          if [[ "$certificate_sha256" != "$expected_sha256" ]]; then
+            echo "::error::Signing certificate fingerprint mismatch: $certificate_sha256"
+            exit 1
+          fi
+          echo "Existing release signing key verified; certificate SHA-256: $certificate_sha256"
+
           printf '%s\n' "LASTFM_API_KEY=$LASTFM_API_KEY" "LASTFM_SECRET=$LASTFM_SECRET" > local.properties
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > voidmusic-release.jks
           {
             printf 'storeFile=voidmusic-release.jks\n'
             printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
