@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.tv.dialogs
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -106,7 +107,7 @@ private fun TvUpdateControls(state: DownloadState, notes: String?, onDismiss: ()
             }
 
             is DownloadState.Downloading -> {
-                TvDownloadProgress(fraction = s.fraction)
+                TvDownloadProgress(fraction = s.fraction ?: 0f)
                 Spacer(modifier = Modifier.height(21.dp))
                 TvDialogButton(text = "Hide", onClick = onDismiss, initialFocus = true)
                 Spacer(modifier = Modifier.height(6.dp))
@@ -120,7 +121,11 @@ private fun TvUpdateControls(state: DownloadState, notes: String?, onDismiss: ()
             is DownloadState.Ready -> {
                 TvDialogButton(
                     text = "Install Now",
-                    onClick = { AppUpdateChecker.installApk(context, s.file) },
+                    onClick = {
+                        AppUpdateChecker.installerIntent(context, s.file)
+                            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            ?.let(context::startActivity)
+                    },
                     initialFocus = true,
                 )
                 Spacer(modifier = Modifier.height(6.dp))

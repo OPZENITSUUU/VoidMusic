@@ -291,6 +291,9 @@ val newPipeExtractorStripped = tasks.register<org.gradle.api.tasks.bundling.Jar>
 dependencies {
     implementation(project(":shared"))
     implementation(project(":sharedUi"))
+    // The TV target compiles the phone app's shared source tree, including its
+    // persistent update-notification worker and scheduler.
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
 
     // ---- Compose (Material 3) ----
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
