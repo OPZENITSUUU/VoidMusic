@@ -21,6 +21,7 @@ import androidx.media3.datasource.cache.SimpleCache
 import java.io.IOException
 import com.music.bitchord.data.innertube.StreamResolver
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.settings.AddonCacheMode
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sources.DeviceCodecs
 import com.music.bitchord.data.sources.SourceKind
@@ -479,6 +480,19 @@ object AudioCache {
      */
     enum class Origin { YOUTUBE, JIOSAAVN, OTHER }
 
+    const val ADDON_PREFETCH_PARAM = "addon_cache_prefetch"
+
+    enum class AddonPrefetchPhase { QUEUED, CACHING, READY, SKIPPED, FAILED }
+
+    data class AddonPrefetchStatus(
+        val queuePosition: Int,
+        val queueSize: Int,
+        val title: String,
+        val phase: AddonPrefetchPhase,
+        val bytesCached: Long = 0,
+        val totalBytes: Long? = null,
+    )
+
     /** One track in the Cached songs folder. */
     data class CachedSong(
         val song: Song,
@@ -490,6 +504,11 @@ object AudioCache {
     )
 
     private val _contentsChanged = MutableStateFlow(0)
+
+    private val _addonPrefetchStatus = MutableStateFlow<List<AddonPrefetchStatus>>(emptyList())
+
+    /** Current add-on read-ahead status for the Storage settings screen. */
+    val addonPrefetchStatus: StateFlow<List<AddonPrefetchStatus>> = _addonPrefetchStatus.asStateFlow()
 
     /** Bumped whenever the cache is emptied, so an open Cached songs folder can re-read itself. */
     val contentsChanged: StateFlow<Int> = _contentsChanged.asStateFlow()
@@ -913,6 +932,8 @@ object AudioCache {
 
     private var job: Job? = null
     private var pendingQueue: List<String> = emptyList()
+    private var addonJob: Job? = null
+    private var pendingAddonQueue: List<String> = emptyList()
 
     /**
      * Gets the queue ahead of the one playing warmed up, in play order.
@@ -941,6 +962,7 @@ object AudioCache {
      * of skips only wherever the listener actually lands is worth chasing.
      */
     fun prefetchQueue(upcoming: List<Upcoming>) {
+        prefetchAddonQueue(upcoming)
         val mediaIds = upcoming.map { it.mediaId }
         if (mediaIds == pendingQueue) return
         android.util.Log.d("BCFetchDebug", "prefetchQueue: head ${pendingQueue.firstOrNull()} -> ${mediaIds.firstOrNull()}")
@@ -1062,7 +1084,166 @@ object AudioCache {
      * else. It rides along from the queue instead — see
      * [PlaybackService.prefetchAround][com.music.bitchord.playback.PlaybackService].
      */
-    data class Upcoming(val mediaId: String, val target: TrackMatcher.Target)
+    data class Upcoming(
+        val mediaId: String,
+        val target: TrackMatcher.Target,
+        /** The exact internal playback URI, including the chosen add-on mix and quality identity. */
+        val uri: Uri? = null,
+    )
+
+    private fun prefetchAddonQueue(upcoming: List<Upcoming>) {
+        val mode = AppSettings.addonCacheMode.value
+        val eligible = upcoming.asSequence().mapNotNull { item ->
+            val identity = SourceRegistry.parseTrackKey(item.mediaId) ?: return@mapNotNull null
+            val uri = item.uri ?: return@mapNotNull null
+            val config = SourceRegistry.config(identity.first) ?: return@mapNotNull null
+            if (config.kind != SourceKind.ADDON || !config.enabled || !config.networkAccessAuthorized || !config.allowDownloads) {
+                return@mapNotNull null
+            }
+            if (uri.authority != "source" || uri.getQueryParameter("s") != identity.first || uri.getQueryParameter("t") != identity.second) {
+                return@mapNotNull null
+            }
+            item
+        }.take(mode.upcomingTrackLimit).toList()
+        val requestKeys = eligible.map { item -> keyFactory.buildCacheKey(DataSpec(item.uri!!)) }
+        if (requestKeys == pendingAddonQueue && addonJob?.isActive == true) return
+
+        addonJob?.cancel()
+        pendingAddonQueue = requestKeys
+        if (eligible.isEmpty()) {
+            addonJob = null
+            _addonPrefetchStatus.value = emptyList()
+            return
+        }
+
+        _addonPrefetchStatus.value = eligible.mapIndexed { index, item ->
+            AddonPrefetchStatus(
+                queuePosition = index + 1,
+                queueSize = eligible.size,
+                title = notedSongs[item.mediaId]?.title?.takeIf(String::isNotBlank) ?: "Add-on track",
+                phase = AddonPrefetchPhase.QUEUED,
+            )
+        }
+        addonJob = scope.launch {
+            eligible.forEachIndexed { index, item ->
+                val uri = item.uri ?: return@forEachIndexed
+                val key = requestKeys[index]
+                if (!mayPersist(uri) || !hasReadAheadSpace()) {
+                    publishAddonStatus(requestKeys, index) { it.copy(phase = AddonPrefetchPhase.SKIPPED) }
+                    return@forEachIndexed
+                }
+                if (isFullyCached(uri)) {
+                    val bytes = cachedBytes(key)
+                    publishAddonStatus(requestKeys, index) {
+                        it.copy(phase = AddonPrefetchPhase.READY, bytesCached = bytes, totalBytes = bytes.takeIf { value -> value > 0 })
+                    }
+                    return@forEachIndexed
+                }
+
+                publishAddonStatus(requestKeys, index) { it.copy(phase = AddonPrefetchPhase.CACHING) }
+                val result = try {
+                    Result.success(cacheAddonTrack(uri, key, requestKeys, index))
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    Result.failure(failure)
+                }
+                if (!isActiveRequest(requestKeys)) return@launch
+                val bytes = cachedBytes(key)
+                val total = cacheLength(key).takeIf { it > 0 }
+                val succeeded = result.getOrDefault(false)
+                publishAddonStatus(requestKeys, index) {
+                    it.copy(
+                        phase = when {
+                            succeeded -> AddonPrefetchPhase.READY
+                            bytes > 0 -> AddonPrefetchPhase.SKIPPED
+                            else -> AddonPrefetchPhase.FAILED
+                        },
+                        bytesCached = bytes,
+                        totalBytes = total,
+                    )
+                }
+                // Give the player and other cache readers a chance to take the
+                // newly prepared entry before opening the next provider stream.
+                if (index < eligible.lastIndex) delay(250)
+            }
+        }
+    }
+
+    private fun isActiveRequest(requestKeys: List<String>) = pendingAddonQueue == requestKeys
+
+    private fun publishAddonStatus(
+        requestKeys: List<String>,
+        index: Int,
+        update: (AddonPrefetchStatus) -> AddonPrefetchStatus,
+    ) {
+        if (!isActiveRequest(requestKeys)) return
+        _addonPrefetchStatus.value = _addonPrefetchStatus.value.mapIndexed { i, item ->
+            if (i == index) update(item) else item
+        }
+    }
+
+    /** Re-check provider permissions after stream resolution, when its manifest policy is current. */
+    fun mayPersist(uri: Uri, actualSourceId: String? = null): Boolean {
+        if (!diskCacheAllowed(uri)) return false
+        if (actualSourceId == null) return true
+        val config = SourceRegistry.config(actualSourceId) ?: return false
+        return config.enabled && (!config.kind.isUserAdded || config.networkAccessAuthorized) && config.allowDownloads
+    }
+
+    private suspend fun cacheAddonTrack(uri: Uri, cacheKey: String, requestKeys: List<String>, index: Int): Boolean {
+        val upstream = upstreamFactory ?: return false
+        if (!isActiveRequest(requestKeys) || !mayPersist(uri) || !hasReadAheadSpace()) return false
+
+        var writerRef: CacheWriter? = null
+        val listener = CacheWriter.ProgressListener { requestLength, bytesCached, _ ->
+            // A provider can revoke caching permission or storage can run low
+            // while the stream is in flight. Cancel before another range lands.
+            if (!mayPersist(uri) || !hasReadAheadSpace()) writerRef?.cancel()
+            publishAddonStatus(requestKeys, index) {
+                it.copy(
+                    phase = AddonPrefetchPhase.CACHING,
+                    bytesCached = bytesCached,
+                    totalBytes = requestLength.takeIf { value -> value > 0 && value != C.LENGTH_UNSET.toLong() },
+                )
+            }
+        }
+        val source = readAheadCacheFactory(upstream)
+            .apply { setCacheKeyFactory { cacheKey } }
+            .createDataSource()
+        val spec = DataSpec.Builder()
+            .setUri(uri.buildUpon().appendQueryParameter(ADDON_PREFETCH_PARAM, "1").build())
+            .setPosition(0)
+            .setLength(C.LENGTH_UNSET.toLong())
+            .build()
+        val writer = CacheWriter(source, spec, null, listener)
+        writerRef = writer
+        return try {
+            withContext(Dispatchers.IO) {
+                val handle = coroutineContext.job.invokeOnCompletion { writer.cancel() }
+                try {
+                    writer.cache()
+                } finally {
+                    handle.dispose()
+                }
+            }
+            isActiveRequest(requestKeys) && mayPersist(uri)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        } finally {
+            if (!mayPersist(uri)) runCatching { cache.removeResource(cacheKey) }
+        }
+    }
+
+    private fun cachedBytes(key: String): Long = runCatching {
+        cache.getCachedSpans(key).filter { it.isCached }.sumOf { it.length }
+    }.getOrDefault(0L)
+
+    private fun cacheLength(key: String): Long = runCatching {
+        cache.getContentMetadata(key).get(ContentMetadata.KEY_CONTENT_LENGTH, C.LENGTH_UNSET.toLong())
+    }.getOrDefault(C.LENGTH_UNSET.toLong())
 
     /**
      * Nothing to read ahead for once playback stops. The queue is cleared with
@@ -1073,6 +1254,10 @@ object AudioCache {
         pendingQueue = emptyList()
         job?.cancel()
         job = null
+        pendingAddonQueue = emptyList()
+        addonJob?.cancel()
+        addonJob = null
+        _addonPrefetchStatus.value = emptyList()
     }
 
     /**

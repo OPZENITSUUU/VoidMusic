@@ -58,6 +58,17 @@ enum class OutputPcmMode(val label: String) {
     FLOAT_32("32-bit float"),
 }
 
+/** How many upcoming addon tracks the read-ahead cache may prepare. */
+enum class AddonCacheMode(val upcomingTrackLimit: Int) {
+    STANDARD(1),
+    AGGRESSIVE(5);
+
+    companion object {
+        fun fromPreference(value: String?): AddonCacheMode =
+            values().firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: STANDARD
+    }
+}
+
 /**
  * What to keep when a track is saved to the device.
  *
@@ -538,6 +549,9 @@ object AppSettings {
      */
     val audioCacheLimitBytes = MutableStateFlow(DEFAULT_CACHE_LIMIT_BYTES)
 
+    /** Addon pre-cache is opt-in beyond the single next track. */
+    val addonCacheMode = MutableStateFlow(AddonCacheMode.STANDARD)
+
     /**
      * Whether Library's "On device" shelf carries the Cached songs folder —
      * the YouTube and JioSaavn tracks the song cache is holding. Off by
@@ -903,6 +917,7 @@ object AppSettings {
         paxSenixApiKey.value = prefs.getString(KEY_PAXSENIX_API_KEY, "").orEmpty()
         com.music.bitchord.data.lyrics.PaxSenix.setApiKey(paxSenixApiKey.value)
         audioCacheLimitBytes.value = clampCacheLimit(prefs.getLong(KEY_CACHE_LIMIT, DEFAULT_CACHE_LIMIT_BYTES))
+        addonCacheMode.value = AddonCacheMode.fromPreference(prefs.getString(KEY_ADDON_CACHE_MODE, null))
         showCacheFolder.value = prefs.getBoolean(KEY_SHOW_CACHE_FOLDER, false)
         lastfmEnabled.value = prefs.getBoolean(KEY_LASTFM_ENABLED, false)
         lastfmUsername.value = prefs.getString(KEY_LASTFM_USERNAME, "").orEmpty()
@@ -1495,6 +1510,11 @@ object AppSettings {
         prefs.edit().putLong(KEY_CACHE_LIMIT, clamped).apply()
     }
 
+    fun setAddonCacheMode(value: AddonCacheMode) {
+        addonCacheMode.value = value
+        prefs.edit().putString(KEY_ADDON_CACHE_MODE, value.name).apply()
+    }
+
     private fun clampCacheLimit(value: Long): Long =
         if (value > MAX_CACHE_LIMIT_BYTES) UNLIMITED_CACHE_LIMIT_BYTES
         else value.coerceAtLeast(DEFAULT_CACHE_LIMIT_BYTES)
@@ -2063,6 +2083,7 @@ object AppSettings {
     private const val KEY_REPLAY_GENRES = "replay_genres"
     private const val KEY_FILTER_NON_MUSIC_AUDIO = "filter_non_music_audio"
     private const val KEY_SHOW_CACHE_FOLDER = "show_cache_folder"
+    private const val KEY_ADDON_CACHE_MODE = "addon_cache_mode"
     private const val KEY_LOCAL_MUSIC_SORT = "local_music_sort"
     private const val KEY_DOWNLOADED_MUSIC_SORT = "downloaded_music_sort"
     private const val KEY_LIBRARY_SORT = "library_sort"

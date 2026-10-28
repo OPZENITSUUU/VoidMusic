@@ -132,6 +132,7 @@ import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.ListenBrainzManager
 import com.music.bitchord.data.scrobbling.ScrobbleManager
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.settings.AddonCacheMode
 import com.music.bitchord.data.settings.EqualizerMode
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.data.sources.SourceResolver
@@ -789,7 +790,7 @@ class PlaybackService : MediaLibraryService() {
     /** Catalogue lookup that decides which rendition of the next video to warm. */
     private var preferredPrefetchJob: Job? = null
     /** Logical queue request, before a video id is replaced by its audio counterpart. */
-    private var preferredPrefetchRequest: Pair<Boolean, List<String>>? = null
+    private var preferredPrefetchRequest: Triple<Boolean, List<String>, AddonCacheMode>? = null
     private var autoplaySeed: String? = null
 
     /** Index in the live queue represented by entry zero of the persisted window. */
@@ -1381,6 +1382,18 @@ class PlaybackService : MediaLibraryService() {
                         "No enabled source could serve ${dataSpec.uri.getQueryParameter("n")}"
                     },
                 )
+                if (dataSpec.uri.getQueryParameter(AudioCache.ADDON_PREFETCH_PARAM) == "1") {
+                    val requestedSource = dataSpec.uri.getQueryParameter("s")
+                    if (requestedSource == null || stream.sourceConfigId != requestedSource) {
+                        throw java.io.IOException("The selected add-on did not supply this track")
+                    }
+                    if (StreamContainer.isManifest(stream.url)) {
+                        throw java.io.IOException("Manifest streams are excluded from full-track pre-cache")
+                    }
+                    if (!AudioCache.mayPersist(dataSpec.uri, stream.sourceConfigId)) {
+                        throw java.io.IOException("The selected provider does not permit audio caching")
+                    }
+                }
                 val configId = dataSpec.uri.getQueryParameter("s")
                 val sourceName = if (directYouTube) {
                     "YouTube"
@@ -6023,30 +6036,32 @@ class PlaybackService : MediaLibraryService() {
      */
     private fun prefetchAround(player: ExoPlayer) {
         val nextIndex = player.nextMediaItemIndex
-        val upcomingSongs = if (nextIndex != C.INDEX_UNSET) {
+        val upcomingItems = if (nextIndex != C.INDEX_UNSET) {
             val end = (nextIndex + AudioCache.QUEUE_DEPTH - 1).coerceAtMost(player.mediaItemCount - 1)
-            (nextIndex..end).map { index -> player.getMediaItemAt(index).toSong() }
+            (nextIndex..end).map { index -> player.getMediaItemAt(index) }
         } else {
             emptyList()
         }
+        val upcomingSongs = upcomingItems.map { it.toSong() }
         // So whatever read-ahead writes for these can be named in the Cached
         // songs folder; its own requests carry nothing but an id.
         AudioCache.noteSongs(upcomingSongs)
         val preferAudio = AppSettings.preferMusicOnly.value
-        val request = preferAudio to upcomingSongs.map { it.videoId }
+        val request = Triple(preferAudio, upcomingSongs.map { it.videoId }, AppSettings.addonCacheMode.value)
         if (request == preferredPrefetchRequest) return
         preferredPrefetchRequest = request
         preferredPrefetchJob?.cancel()
 
         fun warm(songs: List<Song>) {
             AudioCache.prefetchQueue(
-                songs.map { song ->
+                songs.mapIndexed { index, song ->
                     // The title, artist and runtime the item was built with —
                     // see [Song.toMediaItem]. Read from the queued item because
                     // read-ahead has no other way to reach this metadata.
                     AudioCache.Upcoming(
                         mediaId = song.videoId,
                         target = TrackMatcher.targetOf(song),
+                        uri = upcomingItems.getOrNull(index)?.localConfiguration?.uri,
                     )
                 },
             )
@@ -6685,6 +6700,11 @@ class PlaybackService : MediaLibraryService() {
             AppSettings.preferMusicOnly.drop(1).collect {
                 cancelPrefetch()
                 player?.takeIf { it.isPlaying }?.let(::prefetchAround)
+            }
+        }
+        scope.launch {
+            AppSettings.addonCacheMode.drop(1).collect {
+                player?.let(::prefetchAround)
             }
         }
         scope.launch {
@@ -8745,8 +8765,8 @@ class PlaybackService : MediaLibraryService() {
         const val MEDIA_LIKED_ID = "liked"
         /** See [scheduleForeignCachePurge]: comfortably past the longest crossfade. */
         const val FOREIGN_CACHE_PURGE_DELAY_MS = 30_000L
-        /** How many upcoming tracks [scheduleForeignCachePurge] leaves alone for read-ahead and Automix. */
-        const val FOREIGN_CACHE_KEEP_AHEAD = 3
+        /** Covers Aggressive add-on read-ahead (five tracks) as well as ordinary read-ahead and Automix. */
+        const val FOREIGN_CACHE_KEEP_AHEAD = 5
         const val MEDIA_DOWNLOADS_ID = "downloads"
         const val MEDIA_LOCAL_MUSIC_ID = "local_music"
         const val MAX_AUTO_PAGE_SIZE = 50

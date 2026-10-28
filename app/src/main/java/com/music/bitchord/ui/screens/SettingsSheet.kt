@@ -91,6 +91,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -149,6 +150,7 @@ import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.settings.AddonCacheMode
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.data.settings.AutomixPerformanceMode
@@ -238,6 +240,8 @@ fun SettingsScreen(
     val playingFormat by NerdStats.current.collectAsStateWithLifecycle()
     val playingDolbyAtmos = playingFormat?.isDolbyAtmos == true
     val cacheLimitBytes by AppSettings.audioCacheLimitBytes.collectAsStateWithLifecycle()
+    val addonCacheMode by AppSettings.addonCacheMode.collectAsStateWithLifecycle()
+    val addonPrefetchStatuses by AudioCache.addonPrefetchStatus.collectAsStateWithLifecycle()
     val showCacheFolder by AppSettings.showCacheFolder.collectAsStateWithLifecycle()
     val downloadQuality by AppSettings.downloadQuality.collectAsStateWithLifecycle()
     val wifiOnlyDownloads by AppSettings.wifiOnlyDownloads.collectAsStateWithLifecycle()
@@ -1280,6 +1284,80 @@ fun SettingsScreen(
                     valueRange = (AppSettings.DEFAULT_CACHE_LIMIT_BYTES / (1024 * 1024)).toFloat()..
                         CACHE_UNLIMITED_STOP_MB.toFloat(),
                     steps = 19,
+                )
+            }
+            val standardAddonCacheTitle = stringResource(R.string.addon_cache_standard)
+            row(standardAddonCacheTitle, "cache", "addon", "prefetch", "standard") {
+                SettingsRow(
+                    icon = Icons.Rounded.Cached,
+                    title = standardAddonCacheTitle,
+                    subtitle = stringResource(R.string.addon_cache_standard_subtitle),
+                    onClick = { AppSettings.setAddonCacheMode(AddonCacheMode.STANDARD) },
+                    trailing = {
+                        RadioButton(
+                            selected = addonCacheMode == AddonCacheMode.STANDARD,
+                            onClick = { AppSettings.setAddonCacheMode(AddonCacheMode.STANDARD) },
+                        )
+                    },
+                )
+            }
+            val aggressiveAddonCacheTitle = stringResource(R.string.addon_cache_aggressive)
+            row(aggressiveAddonCacheTitle, "cache", "addon", "prefetch", "aggressive") {
+                SettingsRow(
+                    icon = Icons.Rounded.Cached,
+                    title = aggressiveAddonCacheTitle,
+                    subtitle = stringResource(R.string.addon_cache_aggressive_subtitle),
+                    onClick = { AppSettings.setAddonCacheMode(AddonCacheMode.AGGRESSIVE) },
+                    trailing = {
+                        RadioButton(
+                            selected = addonCacheMode == AddonCacheMode.AGGRESSIVE,
+                            onClick = { AppSettings.setAddonCacheMode(AddonCacheMode.AGGRESSIVE) },
+                        )
+                    },
+                )
+            }
+            val addonCacheStatusTitle = stringResource(R.string.addon_cache_status_title)
+            val addonCacheStatusSubtitle = if (addonPrefetchStatuses.isEmpty()) {
+                stringResource(R.string.addon_cache_status_idle)
+            } else {
+                addonPrefetchStatuses.joinToString("\n") { status ->
+                    val detail = when (status.phase) {
+                        AudioCache.AddonPrefetchPhase.QUEUED -> context.getString(
+                            R.string.addon_cache_status_queued,
+                            status.queuePosition,
+                            status.queueSize,
+                        )
+                        AudioCache.AddonPrefetchPhase.CACHING -> {
+                            val total = status.totalBytes
+                            if (total != null && total > 0) {
+                                val percent = ((status.bytesCached * 100) / total).toInt().coerceIn(0, 100)
+                                context.getString(
+                                    R.string.addon_cache_status_progress,
+                                    status.queuePosition,
+                                    status.queueSize,
+                                    percent,
+                                )
+                            } else {
+                                context.getString(
+                                    R.string.addon_cache_status_progress_unknown,
+                                    status.queuePosition,
+                                    status.queueSize,
+                                    status.bytesCached / (1024 * 1024),
+                                )
+                            }
+                        }
+                        AudioCache.AddonPrefetchPhase.READY -> context.getString(R.string.addon_cache_status_ready)
+                        AudioCache.AddonPrefetchPhase.SKIPPED -> context.getString(R.string.addon_cache_status_skipped)
+                        AudioCache.AddonPrefetchPhase.FAILED -> context.getString(R.string.addon_cache_status_failed)
+                    }
+                    "${status.queuePosition}. ${status.title}: $detail"
+                }
+            }
+            row(addonCacheStatusTitle, "cache", "addon", "progress", "status") {
+                SettingsRow(
+                    icon = Icons.Rounded.Cached,
+                    title = addonCacheStatusTitle,
+                    subtitle = addonCacheStatusSubtitle,
                 )
             }
             val clearSongCacheTitle = stringResource(R.string.clear_song_cache)

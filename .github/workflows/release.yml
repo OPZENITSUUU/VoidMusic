@@ -104,7 +104,7 @@ jobs:
           test -s "$apk"
           sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK path is unavailable}}"
           build_tools="$(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$build_tools/aapt" dump badging "$apk" | grep -F "package: name='com.voidmusic.player' versionCode='35' versionName='1.0.3' "
+          "$build_tools/aapt" dump badging "$apk" | grep -F "package: name='com.voidmusic.player' versionCode='36' versionName='1.0.4' "
           "$build_tools/zipalign" -c -v 4 "$apk"
           "$build_tools/apksigner" verify --verbose --print-certs "$apk"
           mkdir -p dist
@@ -128,6 +128,7 @@ jobs:
             - Adds “Refresh Song” to re-resolve the current track and resume near its previous position.
             - Improves addon network-consent handling, URL redaction, and LastWave search-result normalization.
             - Enforces provider-aware disk caching and a low-storage guard.
+            - Adds selectable Standard (one upcoming track) and Aggressive (up to five tracks) add-on pre-cache modes, with progress/status and normal-streaming fallback when caching is unavailable.
             - Shows new releases at app startup with Update Now and Update Later choices; Later keeps the reminder for the next launch.
             - Keeps the existing music-player feature set and app icon.
 
