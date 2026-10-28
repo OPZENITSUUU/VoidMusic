@@ -112,9 +112,11 @@ object SourceRegistry {
 
         val stored = prefs.getString(KEY_SOURCES, null)?.let(::decodeStored) ?: emptyList()
         val defaultAddonsSeeded = prefs.getBoolean(KEY_DEFAULT_ADDONS_SEEDED_V1, false)
+        val requestedAddonsSeeded = prefs.getBoolean(KEY_REQUESTED_ADDONS_SEEDED_V2, false)
         val after = sourcesForInit(
             stored,
             seedDefaultAddons = !defaultAddonsSeeded,
+            seedRequestedAddons = !requestedAddonsSeeded,
         )
 
         // Publish state and the migration marker in one preferences edit. If a
@@ -122,10 +124,11 @@ object SourceRegistry {
         // disabled source, the next launch would otherwise believe the forced
         // opt-out had already happened and silently restore the old on state.
         publish(after, persist = false)
-        if (after != stored || !defaultAddonsSeeded) {
+        if (after != stored || !defaultAddonsSeeded || !requestedAddonsSeeded) {
             prefs.edit()
                 .putString(KEY_SOURCES, json.encodeToString(ListSerializer(SourceConfig.serializer()), after))
                 .putBoolean(KEY_DEFAULT_ADDONS_SEEDED_V1, true)
+                .putBoolean(KEY_REQUESTED_ADDONS_SEEDED_V2, true)
                 .apply()
         }
     }
@@ -136,6 +139,7 @@ object SourceRegistry {
     internal fun sourcesForInit(
         stored: List<SourceConfig>,
         seedDefaultAddons: Boolean = true,
+        seedRequestedAddons: Boolean = true,
     ): List<SourceConfig> {
         // Seeded rather than persisted-on-first-write, so a build adding a new
         // built-in kind picks it up for existing installs too. Commons remains
@@ -145,15 +149,25 @@ object SourceRegistry {
         val withBuiltIns = withoutRetiredAddons + BUILT_IN_KINDS
             .filter { kind -> withoutRetiredAddons.none { it.kind == kind } }
             .map { SourceConfig(kind = it) }
-        val seeded = if (!seedDefaultAddons) {
-            withBuiltIns
-        } else {
-            withBuiltIns + DEFAULT_ADDONS.filter { candidate ->
-                withBuiltIns.none {
+        val defaultSeeds = if (seedDefaultAddons) {
+            DEFAULT_ADDONS.filterNot { candidate ->
+                withBuiltIns.any {
                     it.kind == SourceKind.ADDON && canonicalUrl(it.baseUrl) == canonicalUrl(candidate.baseUrl)
                 }
             }
+        } else {
+            emptyList()
         }
+        val requestedSeeds = if (seedRequestedAddons) {
+            REQUESTED_DEFAULT_ADDONS.filterNot { candidate ->
+                (withBuiltIns + defaultSeeds).any {
+                    it.kind == SourceKind.ADDON && canonicalUrl(it.baseUrl) == canonicalUrl(candidate.baseUrl)
+                }
+            }
+        } else {
+            emptyList()
+        }
+        val seeded = withBuiltIns + defaultSeeds + requestedSeeds
 
         // The retired built-in module is removed, while a custom module entered
         // by the user is preserved.
@@ -579,8 +593,57 @@ object SourceRegistry {
         ),
     )
 
+    /**
+     * Add-ons explicitly requested for Void Music's default configuration.
+     * These four endpoints are enabled and network-authorized because the user
+     * supplied them for this purpose. The Nebula install URL includes a
+     * provider-generated token in its path and is intentionally public in this
+     * build at the user's explicit direction; anyone who extracts the APK or
+     * reads this source can recover that URL. Downloads remain off until an
+     * add-on manifest is read and its policy recorded.
+     */
+    private val REQUESTED_DEFAULT_ADDONS = listOf(
+        SourceConfig(
+            id = "default-addon-nullbeat-v1",
+            kind = SourceKind.ADDON,
+            label = "NullBeat · Max (Auto)",
+            baseUrl = "https://nullbeat.thevolecitor.qzz.io/MzNkODM4MDEtMTNiZS00NGNkLWFjYTEtZGQ4OTNhZDkwMGMzfHx8TUFY",
+            enabled = true,
+            networkAccessAuthorized = true,
+            allowDownloads = false,
+        ),
+        SourceConfig(
+            id = "default-addon-nebula-v1",
+            kind = SourceKind.ADDON,
+            label = "Nebula (Tidal - Torrents)",
+            baseUrl = "https://nebula.eclipsemusic.app/gAAAAABq3QTpAg_Yy3A3csZUWOmUZsHwpb5V1BF7MRM7XoVP7UNKDkqv1KW0v1I_gDJmDwxtT_Lf29EGRk-Ja1S-7yYse44jYQ749PPjBFru9lLnqcyU651s8kc-GPCRkv96A4YOtbqnh12q-hNzLPUXKJfC3DVvZyhB0O31VDg0Poadv7LwWDolbfiyOCnsVJ70_Sw1w6o81BFrAaMJ0Of5abdLuozj8bwKCbHIzLAkZQ25t5kRkekXwJS3NsKVMj5gIPoTKu6mT4DC9wlMwJq5lRFstiKjhxsrNlZktnFRClPkHVaHc_zfwz8U6LGH6GxcGrULYJYg1XyvJhSomPnP7Erc8nXrFg==",
+            enabled = true,
+            networkAccessAuthorized = true,
+            allowDownloads = false,
+        ),
+        SourceConfig(
+            id = "default-addon-rukia-v1",
+            kind = SourceKind.ADDON,
+            label = "Rukia Addon",
+            baseUrl = "https://rukia-addon-vercel-preview.vercel.app",
+            enabled = true,
+            networkAccessAuthorized = true,
+            allowDownloads = false,
+        ),
+        SourceConfig(
+            id = "default-addon-lastwave-v1",
+            kind = SourceKind.ADDON,
+            label = "LastWave",
+            baseUrl = "https://lastwaveaddons.clashprojects.qd.je/a/91c45779011d4303e9d97077830f7ab9419773cd2fd65cf7bb0c502009aecd8b",
+            enabled = true,
+            networkAccessAuthorized = true,
+            allowDownloads = false,
+        ),
+    )
+
     private const val KEY_SOURCES = "sources"
     private const val KEY_DEFAULT_ADDONS_SEEDED_V1 = "default_addons_seeded_v1"
+    private const val KEY_REQUESTED_ADDONS_SEEDED_V2 = "requested_addons_seeded_v2"
     private const val PREFIX = "src:"
     private const val SEPARATOR = "::"
 }
