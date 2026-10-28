@@ -10,6 +10,7 @@ import com.music.bitchord.data.settings.DownloadQuality
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.selects.select
 
@@ -182,23 +183,30 @@ object SourceResolver {
         // expressible.
         // A row picked by hand is not up for substitution — see [MIX_PARAM].
         val picked = pickedMix != null && pinned is AddonSource
-        // Automatic mode is deliberately opt-in: it waits for all enabled
-        // matching sources and compares resolved StreamFormat values, rather
-        // than trusting a catalogue's quality label. Keep the pinned stream as
-        // a candidate and replace it only when actual reported quality is higher.
+        // Automatic mode waits for all enabled matching sources and compares
+        // resolved stream metadata rather than trusting a catalogue's row label.
+        // The pinned stream and cross-source searches run concurrently so a
+        // slow starting source cannot serialize every alternative behind it.
         if (automaticBest && !picked) {
-            val pinnedStream = pinned?.let { source ->
-                attempt(source) { source.stream(trackId, request) }
-                    ?.copy(sourceConfigId = source.configId)
+            val (pinnedStream, bestAlternative) = coroutineScope {
+                val pinnedAnswer = async {
+                    pinned?.let { source ->
+                        attempt(source) { source.stream(trackId, request) }
+                            ?.copy(sourceConfigId = source.configId)
+                    }
+                }
+                val alternativeAnswer = async {
+                    bestAcross(
+                        sources = active.filterNot { it.configId == configId },
+                        target = target,
+                        request = request,
+                        waitForAll = true,
+                        strictLength = target.durationSec != null,
+                        requireSharedArtist = true,
+                    )
+                }
+                pinnedAnswer.await() to alternativeAnswer.await()
             }
-            val bestAlternative = bestAcross(
-                sources = active.filterNot { it.configId == configId },
-                target = target,
-                request = request,
-                waitForAll = true,
-                strictLength = target.durationSec != null,
-                requireSharedArtist = true,
-            )
             val alternateStream = bestAlternative?.second
             if (alternateStream != null &&
                 (pinnedStream == null || isBetter(alternateStream.format, pinnedStream.format))
@@ -575,6 +583,7 @@ object SourceResolver {
     suspend fun forDownload(
         target: TrackMatcher.Target,
         request: StreamRequest = requestForDownload(),
+        excludedSourceIds: Set<String> = emptySet(),
     ): SourceStream? = coroutineScope {
         if (target.title.isBlank()) return@coroutineScope null
         val wantsLossless = when (request) {
@@ -594,7 +603,7 @@ object SourceResolver {
         // has no business deciding that a file saved over Wi-Fi later is a
         // YouTube one. Minus any addon whose manifest says `allowDownloads: 0`:
         // that one plays, but the file comes from whoever is next in line.
-        val active = SourceRegistry.activeForDownload()
+        val active = SourceRegistry.activeForDownload().filterNot { it.configId in excludedSourceIds }
         // YouTube can be switched off, and a download still goes to it when
         // nothing here answers — the download path never consults this list. So
         // an absent YouTube means everything enabled outranks it, which is
@@ -612,13 +621,9 @@ object SourceResolver {
         val bitExact = if (wantsLossless) ranked.filter { it.kind.canServeLossless } else emptyList()
         val elsewhere = ranked - bitExact.toSet()
 
-        // Asked now, read at the end — and raced rather than walked, because
-        // these differ in speed by two orders of magnitude and the whole lookup
-        // is on a clock. See [bestAcross], which takes the first answer that
-        // clears the bar rather than the best of all of them: JioSaavn's four
-        // tenths of a second is what that rule is tuned for, and a module that
-        // beats it to the line with something thin is a case the floor below
-        // catches by sending the download to YouTube.
+        // Query the lossy-capable providers concurrently and wait for the
+        // bounded search to settle: a quick low-tier answer must not hide a
+        // better rendition still being resolved by another eligible provider.
         val elsewhereBest = async {
             bestAcross(
                 elsewhere,
@@ -630,6 +635,7 @@ object SourceResolver {
                 StreamRequest.Best,
                 waitForAll = true,
                 strictLength = strictLength,
+                requireSharedArtist = true,
             ) { source, stream ->
                 // Bit-exact audio is *over* budget on the High rung, not a
                 // bonus on it. Someone who picked High over Lossless picked the
@@ -649,20 +655,26 @@ object SourceResolver {
             }
         }
 
-        // The best lossy copy seen so far and who offered it — carried together
+        // The best copy seen so far and who offered it — carried together
         // so the log line at the end can say where the file came from, which is
         // the only record of it there will be once it is on disk.
         var best: Pair<MusicSource, SourceStream>? = null
-        for (source in bitExact) {
-            val stream = matchAndStream(
-                source,
-                target,
-                // The request the guard above already narrowed, rather than a
-                // second statement of it that could drift from the first.
-                request,
-                waitForAll = true,
-                strictLength = strictLength,
-            ) ?: continue
+        val bitExactResults = bitExact.map { source ->
+            async {
+                source to matchAndStream(
+                    source,
+                    target,
+                    // The request the guard above already narrowed, rather than a
+                    // second statement of it that could drift from the first.
+                    request,
+                    waitForAll = true,
+                    strictLength = strictLength,
+                    requireSharedArtist = true,
+                )
+            }
+        }.awaitAll()
+        for ((source, stream) in bitExactResults) {
+            if (stream == null) continue
             // Dolby Atmos is not bit-exact PCM, but it is the native premium
             // rendition that playback already prefers.  Keep it on the same
             // first-class download path instead of throwing it away and
@@ -672,11 +684,11 @@ object SourceResolver {
                     TAG,
                     "download: '${target.title}' from ${source.displayName} at ${stream.format.summary}",
                 )
-                // Nothing is waiting on it any more, and leaving it running
-                // would hold this whole call open on a source whose answer has
-                // just been beaten by the requested premium rendition.
-                elsewhereBest.cancel()
-                return@coroutineScope stream
+                // Keep comparing every eligible source. A lossless answer is
+                // not automatically the best one when another provider has a
+                // higher-resolution copy or a preferred compatible mix.
+                if (isBetter(stream.format, best?.second?.format)) best = source to stream
+                continue
             }
             TrackLog.d(
                 TAG,
@@ -1136,7 +1148,21 @@ object SourceResolver {
         // this listener both want.
         if (candidate.isDolbyAtmos != current.isDolbyAtmos) return candidate.isDolbyAtmos
         if (candidate.isLossless != current.isLossless) return candidate.isLossless == true
-        return (candidate.kbps ?: 0) > (current.kbps ?: 0)
+        if (candidate.isLossless == true) {
+            // Lossless bitrate varies with compression and does not establish
+            // fidelity; prefer stated bit depth and sample rate instead.
+            val candidateDepth = candidate.bitDepth ?: 0
+            val currentDepth = current.bitDepth ?: 0
+            if (candidateDepth != currentDepth) return candidateDepth > currentDepth
+            return (candidate.sampleRateHz ?: 0) > (current.sampleRateHz ?: 0)
+        }
+        val candidateBitrate = candidate.kbps ?: 0
+        val currentBitrate = current.kbps ?: 0
+        if (candidateBitrate != currentBitrate) return candidateBitrate > currentBitrate
+        val candidateRate = candidate.sampleRateHz ?: 0
+        val currentRate = current.sampleRateHz ?: 0
+        if (candidateRate != currentRate) return candidateRate > currentRate
+        return (candidate.bitDepth ?: 0) > (current.bitDepth ?: 0)
     }
 
     /** The higher-quality of two streams — see [isBetter]. */

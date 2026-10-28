@@ -1210,6 +1210,32 @@ class SourcesTest {
     }
 
     @Test
+    fun `ranks higher bitrate lossy streams and uses resolution as the tie break`() {
+        assertTrue(
+            SourceResolver.isBetter(
+                StreamFormat(codec = "aac", kbps = 320),
+                StreamFormat(codec = "opus", kbps = 256),
+            ),
+        )
+        assertTrue(
+            SourceResolver.isBetter(
+                StreamFormat(codec = "aac", kbps = 320, sampleRateHz = 96000, bitDepth = 24),
+                StreamFormat(codec = "aac", kbps = 320, sampleRateHz = 44100, bitDepth = 16),
+            ),
+        )
+    }
+
+    @Test
+    fun `lossless ranking prefers resolution instead of compression bitrate`() {
+        assertTrue(
+            SourceResolver.isBetter(
+                StreamFormat(codec = "flac", kbps = 700, sampleRateHz = 192000, bitDepth = 24),
+                StreamFormat(codec = "flac", kbps = 1400, sampleRateHz = 44100, bitDepth = 16),
+            ),
+        )
+    }
+
+    @Test
     fun `has nothing to offer when no candidate is the recording`() {
         val target = TrackMatcher.Target("Paniyon Sa", "Atif Aslam")
         assertNull(TrackMatcher.best(listOf(song("Paniyon Sa", "Some Cover Band")), target))
@@ -1451,6 +1477,24 @@ class SourcesTest {
         assertEquals("Ricky's Addon", source.displayName)
         assertEquals("flac", stream.format.codec)
         assertFalse("the patient lookup cancelled the later source", slowLossless.cancelled)
+    }
+
+    @Test
+    fun `wait for all compares slow high-quality answer rather than stopping at first provider`() = runBlocking {
+        val fast = FakeSource("Fast AAC", answerAfterMs = 5, format = StreamFormat("aac", kbps = 320))
+        val slow = FakeSource("Slow FLAC", answerAfterMs = 150, format = StreamFormat("flac", sampleRateHz = 96000, bitDepth = 24))
+
+        val (winner, stream) = SourceResolver.bestAcross(
+            listOf(fast, slow),
+            raceTarget(),
+            StreamRequest.Lossless,
+            waitForAll = true,
+        )!!
+
+        assertEquals("Slow FLAC", winner.displayName)
+        assertEquals(true, stream.format.isLossless)
+        assertTrue(fast.asked)
+        assertTrue(slow.asked)
     }
 
     @Test

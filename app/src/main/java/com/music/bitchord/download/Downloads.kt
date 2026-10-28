@@ -831,13 +831,27 @@ object Downloads {
         DownloadSession.running(id, 0f)
 
         try {
-            val plan = prepare(context, song)
+            val quality = AppSettings.downloadQuality.value
+            val excludedSources = linkedSetOf<String>()
+            var plan = prepare(context, song, quality, excludedSources)
             // The manager is showing the row that was tapped, which for a music
             // video is the wrong title and the wrong cover for the file actually
             // being written. Corrected here rather than left to disagree with
             // the notification and with the Downloads page afterwards.
             DownloadSession.retitle(id, plan.track)
-            transfer(context, song, plan)
+            while (true) {
+                try {
+                    transfer(context, song, plan)
+                    break
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val failedSource = plan.route?.sourceConfigId ?: throw e
+                    if (!excludedSources.add(failedSource)) throw e
+                    Log.w(TAG, "source transfer failed for $id; trying next eligible source", e)
+                    plan = prepare(context, song, quality, excludedSources)
+                }
+            }
         } catch (e: CancellationException) {
             clear(id)
             throw e
@@ -868,7 +882,12 @@ object Downloads {
      * running for a track that is still queued — or for one that gets cancelled
      * before its turn — and a preparation is not a download.
      */
-    internal suspend fun prepare(context: Context, song: Song): Prepared = withContext(Dispatchers.IO) {
+    internal suspend fun prepare(
+        context: Context,
+        song: Song,
+        quality: DownloadQuality = AppSettings.downloadQuality.value,
+        excludedSourceIds: Set<String> = emptySet(),
+    ): Prepared = withContext(Dispatchers.IO) {
         // Downloads preserve the exact item the listener picked. Catalogue
         // matching is a manual playback action and must not silently change a
         // download or its filename.
@@ -878,8 +897,6 @@ object Downloads {
         // which rung they are fetching, and re-reading the setting per call
         // would let a change made mid-download splice two renditions into
         // one file.
-        val quality = AppSettings.downloadQuality.value
-
         // Asked before the lookup rather than after it, unlike the check on the
         // route's own filename below. A file already sitting in Music under a
         // lossless extension is the answer to the whole question, and spending
@@ -897,7 +914,7 @@ object Downloads {
             }
         }
 
-        val route = routeFor(context, track, quality)
+        val route = routeFor(context, track, quality, excludedSourceIds)
         Log.d(TAG, "downloading ${song.videoId} as .${route.extension} (${route.describe}, ${quality.label})")
         Prepared(song.videoId, track, route = route, alreadyAt = null)
     }
@@ -1066,6 +1083,8 @@ object Downloads {
         val downloadFormat: String? = null,
         val taggable: Boolean = true,
         val offlineHls: Manifest? = null,
+        /** Non-null only for a configured source; used to retry the next-best provider. */
+        val sourceConfigId: String? = null,
         val write: suspend (OutputStream, (written: Long, total: Long) -> Unit) -> Unit,
     )
 
@@ -1092,8 +1111,13 @@ object Downloads {
      *   than to the middle of this one. [Downloader.fetch] resolves again after
      *   a mid-download refusal and has to ask for the same rung it started on.
      */
-    private suspend fun routeFor(context: Context, track: Song, quality: DownloadQuality): Route {
-        fromSources(track, quality)?.let { (stream, storable) ->
+    private suspend fun routeFor(
+        context: Context,
+        track: Song,
+        quality: DownloadQuality,
+        excludedSourceIds: Set<String> = emptySet(),
+    ): Route {
+        fromSources(track, quality, excludedSourceIds)?.let { (stream, storable) ->
             // A manifest is an index, not audio. Whichever kind it is, fetching
             // it as a file writes the index into something named `.flac` —
             // which is exactly what a `.mpd` did until [OfflineDash] existed:
@@ -1116,6 +1140,7 @@ object Downloads {
                     mimeType = storable.mimeType,
                     describe = "${stream.format.summary} (assembled from ${if (dash) "DASH" else "HLS"})",
                     downloadFormat = stream.format.downloadBadge(),
+                    sourceConfigId = stream.sourceConfigId,
                     write = { sink, onProgress ->
                         ManifestFile.write(
                             context.cacheDir, stream.url, stream.headers, dash,
@@ -1138,6 +1163,7 @@ object Downloads {
                 downloadFormat = stream.format.downloadBadge(),
                 taggable = true,
                 offlineHls = Manifest(stream.url, stream.headers, dash = dash).takeIf { packaged },
+                sourceConfigId = stream.sourceConfigId,
                 write = { sink, onProgress ->
                     Downloader.fetchDirect(stream.url, stream.headers, sink, onProgress)
                 },
@@ -1188,6 +1214,7 @@ object Downloads {
     private suspend fun fromSources(
         track: Song,
         quality: DownloadQuality,
+        excludedSourceIds: Set<String>,
     ): Pair<SourceStream, DownloadStore.Storable>? {
         // Wrapped so the two ways this can come back empty stay apart in the
         // log. `withTimeoutOrNull` collapses them into one null, and the
@@ -1197,17 +1224,31 @@ object Downloads {
         // Lossless queue to YouTube's AAC while the log said nothing at all.
         var timedOut = true
         val stream = withTimeoutOrNull(SOURCE_LOOKUP_MS) {
-            try {
-                SourceResolver.forDownload(
-                    TrackMatcher.targetOf(track),
-                    SourceResolver.requestForDownload(quality),
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "source lookup failed for ${track.videoId}: ${e.message}")
-                null
-            }.also { timedOut = false }
+            val rejected = excludedSourceIds.toMutableSet()
+            while (true) {
+                val candidate = try {
+                    SourceResolver.forDownload(
+                        TrackMatcher.targetOf(track),
+                        SourceResolver.requestForDownload(quality),
+                        excludedSourceIds = rejected,
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "source lookup failed for ${track.videoId}: ${e.message}")
+                    null
+                } ?: break
+                val storable = DownloadStore.storable(candidate.format.codec)
+                if (storable != null) {
+                    timedOut = false
+                    return@withTimeoutOrNull candidate to storable
+                }
+                val sourceId = candidate.sourceConfigId ?: break
+                if (!rejected.add(sourceId)) break
+                Log.d(TAG, "${candidate.format.codec ?: "unknown codec"} is not storable; trying next eligible source")
+            }
+            timedOut = false
+            null
         }
         if (stream == null) {
             if (timedOut) {
@@ -1220,12 +1261,7 @@ object Downloads {
             return null
         }
 
-        val storable = DownloadStore.storable(stream.format.codec)
-        if (storable == null) {
-            Log.d(TAG, "nothing to file a '${stream.format.codec}' as; taking YouTube for ${track.videoId}")
-            return null
-        }
-        return stream to storable
+        return stream
     }
 
     /** Back to "not downloaded" — used for success, where [saved] takes over, and for cancellation. */

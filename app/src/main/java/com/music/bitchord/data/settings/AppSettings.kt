@@ -173,7 +173,7 @@ object AppSettings {
     val audioQualityWifi = MutableStateFlow(AudioQuality.LOSSLESS)
     val audioQualityCellular = MutableStateFlow(AudioQuality.LOSSLESS)
     /** Compare enabled source streams and prefer the best reported codec/bitrate per track. */
-    val automaticSourceSelection = MutableStateFlow(false)
+    val automaticSourceSelection = MutableStateFlow(true)
 
     /** Allowed duration difference when replacing a playing stream with one from a source. */
     val upgradeLengthSlackSeconds = MutableStateFlow(DEFAULT_UPGRADE_LENGTH_SLACK_SECONDS)
@@ -824,7 +824,7 @@ object AppSettings {
         migrateSingleQuality()
         audioQualityWifi.value = readQuality(KEY_QUALITY_WIFI)
         audioQualityCellular.value = readQuality(KEY_QUALITY_CELLULAR)
-        automaticSourceSelection.value = prefs.getBoolean(KEY_AUTOMATIC_SOURCE_SELECTION, false)
+        automaticSourceSelection.value = prefs.getBoolean(KEY_AUTOMATIC_SOURCE_SELECTION, true)
         upgradeLengthSlackSeconds.value = prefs.getInt(
             KEY_UPGRADE_LENGTH_SLACK_SECONDS,
             DEFAULT_UPGRADE_LENGTH_SLACK_SECONDS,
