@@ -8,9 +8,9 @@
     <a href="https://github.com/OPZENITSUUU/VoidMusic/releases/latest/download/Void.Music.apk"><img src="https://img.shields.io/badge/Download-Latest%20Android%20APK-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Download latest Android APK" /></a>
   </p>
   <p>
-    <a href="https://github.com/OPZENITSUUU/VoidMusic/releases"><img src="https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&label=Latest%20release&labelColor=151521" alt="Latest release" /></a>
-    <a href="https://github.com/OPZENITSUUU/VoidMusic/releases"><img src="https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&label=Downloads&labelColor=151521" alt="Total downloads" /></a>
-    <a href="https://github.com/OPZENITSUUU/VoidMusic/blob/main/LICENSE"><img src="https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=151521" alt="License" /></a>
+    <a href="https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&label=Latest%20release&labelColor=151521"><img src="https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&label=Latest%20release&labelColor=151521" alt="Latest release" /></a>
+    <a href="https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&label=Downloads&labelColor=151521"><img src="https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&label=Downloads&labelColor=151521" alt="Total downloads" /></a>
+    <a href="https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=151521"><img src="https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=151521" alt="License" /></a>
   </p>
   <p><a href="#features">Features</a> · <a href="#download">Download</a> · <a href="#build-from-source">Build from source</a> · <a href="#support-and-contributing">Support & contribute</a> · <a href="#legal-notice">Legal notice</a></p>
 </div>
