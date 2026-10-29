@@ -34,55 +34,6 @@ The Android app is the primary published build. The repository also contains sou
 
 > **Important:** a feature being present in the code does not make every third-party service or source permanently available. Login, catalogue access, formats, downloads and quality depend on the selected provider, its authorization rules, your device and your output route.
 
-## ✨ Feature tour
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🎵 Discover &amp; search</h3>
-      <ul>
-        <li>Music search and browsing through the YouTube Music integration.</li>
-        <li>Home and Explore shelves such as Quick Picks, Listen Again, mixes, charts, trending music and new releases where the catalogue supplies them.</li>
-        <li>Search suggestions, supported search filters and search history.</li>
-        <li>Artist, album, playlist and track detail pages.</li>
-        <li>Configurable add-on and JavaScript-module sources.</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🎚️ Shape the playback</h3>
-      <ul>
-        <li>Background playback and persistent media controls.</li>
-        <li>Gapless playback, adjustable crossfade and queue transitions.</li>
-        <li>Automix (Beta) with beat-aware analysis and tempo adjustment where supported.</li>
-        <li>Playback speed, shuffle, repeat, skip silence and sleep timer.</li>
-        <li>Audio-output information and optional Stats for Nerds.</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🎤 Lyrics &amp; artwork</h3>
-      <ul>
-        <li>Timed and word-synced lyric highlighting when timing data is available.</li>
-        <li>Multiple selectable lyric providers.</li>
-        <li>On-demand lyric translation into the app's selected language.</li>
-        <li>Lyric timing offset controls and shareable lyric cards.</li>
-        <li>Artwork-driven colours, animated Canvas artwork and a mesh-gradient player.</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>📚 Library &amp; offline tools</h3>
-      <ul>
-        <li>Local music, downloads, cached songs and network libraries.</li>
-        <li>Browse songs, artists and albums; sort supported local collections.</li>
-        <li>Manage queues and playlists, with track reordering and duplicate checks where supported.</li>
-        <li>Source-aware download quality and embedded metadata/tagging.</li>
-        <li>Adjustable cache limits and upcoming-track cache modes.</li>
-      </ul>
-    </td>
-  </tr>
-</table>
-
 ## 🎧 Playback & audio
 
 Void Music combines a media player with a source-resolution layer. The selected source determines what can actually be played; playback settings control what the app requests and how it handles the resulting stream.
