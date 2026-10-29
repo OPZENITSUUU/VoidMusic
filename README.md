@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="Logo.png" alt="Void Music logo" width="132" />
-
 # VOID MUSIC
 
 ### Find your sound. Own your listening.
