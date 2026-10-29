@@ -1,157 +1,374 @@
 <div align="center">
-  <img src="Logo.png" alt="Void Music logo" width="144" />
-  <h1>Void Music</h1>
-  <p><strong>Your music. Your flow.</strong></p>
-  <p>A customizable Android music client built around flexible sources, detailed playback controls, synced lyrics and an artwork-driven interface.</p>
 
-  <p>
-    <a href="https://github.com/OPZENITSUUU/VoidMusic/releases/latest/download/Void.Music.apk"><img src="https://img.shields.io/badge/Download-Latest%20Android%20APK-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Download latest Android APK" /></a>
-  </p>
-  <p>
-    <a href="https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&label=Latest%20release&labelColor=151521"><img src="https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&label=Latest%20release&labelColor=151521" alt="Latest release" /></a>
-    <a href="https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&label=Downloads&labelColor=151521"><img src="https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&label=Downloads&labelColor=151521" alt="Total downloads" /></a>
-    <a href="https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=151521"><img src="https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=151521" alt="License" /></a>
-  </p>
-  <p><a href="#features">Features</a> · <a href="#download">Download</a> · <a href="#build-from-source">Build from source</a> · <a href="#support-and-contributing">Support & contribute</a> · <a href="#legal-notice">Legal notice</a></p>
-</div>
+<img src="Logo.png" alt="Void Music logo" width="132" />
 
----
+# VOID MUSIC
 
-<p align="center">
-  <img src="Banner.png" alt="Void Music visual banner" width="100%" />
+### Find your sound. Own your listening.
+
+A customizable music client with flexible sources, detailed playback controls, synced lyrics, an artwork-rich player and a library that stays yours.
+
+<p>
+  <a href="https://github.com/OPZENITSUUU/VoidMusic/releases/latest/download/Void.Music.apk"><img src="https://img.shields.io/badge/GET%20VOID%20MUSIC-Latest%20Android%20APK-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Download the latest Android APK" /></a>
 </p>
 
-## About Void Music
+<p>
+  <a href="https://github.com/OPZENITSUUU/VoidMusic/releases"><img src="https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&label=LATEST%20RELEASE&labelColor=151521" alt="Latest release" /></a>
+  <a href="https://github.com/OPZENITSUUU/VoidMusic/releases"><img src="https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&label=DOWNLOADS&labelColor=151521" alt="Total downloads" /></a>
+  <a href="https://github.com/OPZENITSUUU/VoidMusic/blob/main/LICENSE"><img src="https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=151521" alt="License" /></a>
+</p>
 
-Void Music is an Android music client focused on giving listeners more control over discovery, sources, playback and their personal library. Search and play music through supported online sources, bring in local or network music, customize playback behaviour, and keep useful track information close at hand.
+[Features](#-feature-tour) · [Download](#-download) · [Audio quality](#-playback--audio) · [Build](#-build-from-source) · [Contribute](#-support--contributing)
 
-The app supports configurable add-on/module sources, but each source is an independent dependency: availability, sign-in requirements, stream formats and download permissions depend on that source and its service.
+<br/>
 
-## Features
+<img src="Banner.png" alt="Void Music banner" width="100%" />
 
-### 🎧 Playback & audio controls
-
-- **Online discovery:** search, browse and play available music through the YouTube Music integration.
-- **Playback in the background:** persistent media controls and a playback notification.
-- **Gapless playback and crossfade:** adjustable transitions, including a 0–12 second crossfade range.
-- **Automix (Beta):** beat-aware queue transitions with tempo adjustment where analysis and track data allow.
-- **Flexible controls:** playback speed from 0.5× to 2×, skip silence, sleep timer and system equalizer integration.
-- **Per-network quality settings:** set separate streaming quality limits for Wi-Fi and mobile data.
-- **Stats for Nerds:** inspect selected input details such as codec, sample rate and bit depth from the player.
-- **Automatic best-source selection:** compare available source metadata when selecting a supported alternative rendition.
-
-> **Audio-quality note:** Void Music does not promise that every track will be lossless, Hi-Res or Dolby Atmos. Those formats depend on what a configured source actually supplies, any required authorization, the device's decoder and the selected audio-output route. A source label or bitrate value alone is not proof of bit-perfect output.
-
-### 🔌 Sources & integrations
-
-- Add, edit, test and health-check supported add-on/module sources.
-- Use supported alternate renditions when a configured source can resolve and deliver them.
-- Connect supported Google/YouTube Music and Spotify account features.
-- Scrobble listening activity to Last.fm and ListenBrainz when configured.
-- Show current-track details through Discord Rich Presence when connected.
-- Use Listen Together, supported casting options and network libraries where configured.
-
-External services may change their APIs, authentication requirements or terms. A source appearing in the app does not guarantee that its service is currently available or authorized for every track.
-
-### 📚 Library, downloads & cache
-
-- Play local music alongside supported online sources.
-- Save supported tracks for offline listening with available metadata and tags.
-- Browse cached audio and manage the app's audio-cache storage limit.
-- **Standard add-on cache:** prepare 1 upcoming add-on track.
-- **Aggressive add-on cache:** prepare up to 5 upcoming add-on tracks, where the source and available resources permit it.
-- Work with supported SMB/WebDAV network locations and personal libraries.
-
-Download availability and format depend on the selected source and its permissions. Do not assume that a streaming source allows a track to be saved.
-
-### ✨ Lyrics & interface
-
-- Word-synced lyrics with highlighting when timed lyrics are available.
-- Multiple lyrics providers, with availability varying by track and provider.
-- Artwork-driven colours and animated artwork on the player where supported.
-- Frosted-glass surfaces and a Material 3 interface.
-- Playback queue, track actions, playlists and personal listening features.
-
-## Download
-
-<div align="center">
-  <a href="https://github.com/OPZENITSUUU/VoidMusic/releases/latest/download/Void.Music.apk"><img src="https://img.shields.io/badge/Download-Void.Music.apk-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Download Void Music APK" /></a>
-  <p><a href="https://github.com/OPZENITSUUU/VoidMusic/releases">View all releases and version notes</a></p>
 </div>
 
-**Platform:** Android 8.0 (API 26) or newer. An internet connection is required for online music and third-party services; local playback depends on the files or network locations you select.
+---
 
-### Install
+## What is Void Music?
 
-1. Open the [latest release](https://github.com/OPZENITSUUU/VoidMusic/releases/latest) and download **\`Void.Music.apk\`**.
-2. Open the downloaded APK and allow your file manager or browser to install apps from that source if Android asks.
-3. Finish installation, open Void Music and configure any optional accounts or sources you use.
+Void Music is an independent music-client distribution built around a simple idea: **your player should give you control, not hide how it works.** Discover music through supported catalogues, configure compatible sources, shape the sound, follow lyrics, manage a personal library and understand the stream the player actually receives.
 
-Android only permits an in-place app update when the installed and downloaded APKs use a compatible package identity and signing certificate. Back up important app data before changing builds or uninstalling an existing version.
+The Android app is the primary published build. The repository also contains source for additional targets, including Android TV, Wear OS, desktop and a web player with a companion browser extension. These targets have different build and release states; see [Platform availability](#-platform-availability).
 
-## Build from source
+> **Important:** a feature being present in the code does not make every third-party service or source permanently available. Login, catalogue access, formats, downloads and quality depend on the selected provider, its authorization rules, your device and your output route.
 
-### Requirements
+## ✨ Feature tour
 
-- A compatible JDK (17 or newer)
-- Android SDK with the platform/build tools required by the Gradle project
-- Android NDK/CMake components requested by the project for native audio components
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🎵 Discover &amp; search</h3>
+      <ul>
+        <li>Music search and browsing through the YouTube Music integration.</li>
+        <li>Home and Explore shelves such as Quick Picks, Listen Again, mixes, charts, trending music and new releases where the catalogue supplies them.</li>
+        <li>Search suggestions, supported search filters and search history.</li>
+        <li>Artist, album, playlist and track detail pages.</li>
+        <li>Configurable add-on and JavaScript-module sources.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🎚️ Shape the playback</h3>
+      <ul>
+        <li>Background playback and persistent media controls.</li>
+        <li>Gapless playback, adjustable crossfade and queue transitions.</li>
+        <li>Automix (Beta) with beat-aware analysis and tempo adjustment where supported.</li>
+        <li>Playback speed, shuffle, repeat, skip silence and sleep timer.</li>
+        <li>Audio-output information and optional Stats for Nerds.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🎤 Lyrics &amp; artwork</h3>
+      <ul>
+        <li>Timed and word-synced lyric highlighting when timing data is available.</li>
+        <li>Multiple selectable lyric providers.</li>
+        <li>On-demand lyric translation into the app's selected language.</li>
+        <li>Lyric timing offset controls and shareable lyric cards.</li>
+        <li>Artwork-driven colours, animated Canvas artwork and a mesh-gradient player.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>📚 Library &amp; offline tools</h3>
+      <ul>
+        <li>Local music, downloads, cached songs and network libraries.</li>
+        <li>Browse songs, artists and albums; sort supported local collections.</li>
+        <li>Manage queues and playlists, with track reordering and duplicate checks where supported.</li>
+        <li>Source-aware download quality and embedded metadata/tagging.</li>
+        <li>Adjustable cache limits and upcoming-track cache modes.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-### Build a development APK
+## 🎧 Playback & audio
 
-\`\`\`bash
-git clone https://github.com/OPZENITSUUU/VoidMusic.git
-cd VoidMusic
-./gradlew :app:assemblePersonalDebug
-\`\`\`
+Void Music combines a media player with a source-resolution layer. The selected source determines what can actually be played; playback settings control what the app requests and how it handles the resulting stream.
 
-The development APK is produced under \`app/build/outputs/apk/personal/debug/\`. To run the corresponding unit tests:
+### Playback controls
 
-\`\`\`bash
-./gradlew :app:testPersonalDebugUnitTest :sharedUi:jvmTest
-\`\`\`
+- **Background listening:** persistent media session and system playback controls.
+- **Queue control:** add, remove, clear and reorder queued tracks, plus shuffle and repeat modes.
+- **Crossfade:** configurable transition length from **0 to 12 seconds**.
+- **Automix (Beta):** beat/downbeat analysis and tempo-aware transitions where the track and analysis data allow.
+- **Playback speed:** **0.5×–2.0×**.
+- **Skip silence** and a **sleep timer**, including stop-after-current-track behaviour.
+- **Playback fallback and rendition upgrades:** use compatible alternative streams when a configured source can resolve them.
+- **Per-network quality ceilings:** independent preferences for Wi-Fi and mobile data.
 
-A distributable release must be built and signed with an authorized release key. Signing keys and passwords are intentionally not included in the repository; never commit keystores, signing properties or service secrets.
+### Audio formats, output & diagnostics
 
-## Project layout
+- **Stats for Nerds:** inspect the selected input format, including available codec, sample-rate and bit-depth information.
+- **Audio pipeline/output views:** review format and output-route information exposed by the current device and player.
+- **Quality-aware source choice:** an optional best-source preference compares available source metadata; it is not a guarantee that every song has a better or lossless alternative.
+- **System equalizer integration** plus app playback-processing controls.
+- **USB/direct-output paths** where supported by the hardware, Android version and connected device.
+- **Extended codec decoding:** the project includes native decoding support for additional formats, including ALAC and selected Dolby/DTS-family formats. Actual decoding and output depend on the build, input stream, licensing/device support and route.
+- **Spatial-audio processing** and output capability checks.
+- **Bluetooth capability awareness:** the app distinguishes reported codec labels from proof that a particular route can deliver the requested fidelity.
 
-| Path | Purpose |
+> [!IMPORTANT]
+> **Lossless, Hi-Res and Dolby Atmos are conditional capabilities, not universal promises.** Void Music cannot turn a lossy stream into genuine lossless audio. A source badge, file extension or reported bitrate alone does not prove bit-perfect output. The source must deliver the format, and the decoder, device and output route must support it.
+
+## 🔌 Sources & service integrations
+
+### Source choices
+
+- **YouTube Music integration** for supported search, browsing and playback.
+- **JioSaavn source integration** where its service endpoints are available.
+- **Wikimedia Commons** for supported public media.
+- **Add-on sources:** configure, enable/disable, reorder, test and health-check compatible source endpoints.
+- **JavaScript modules:** load compatible modules through the project's QuickJS-based module runtime.
+- **Source matching:** compare candidate tracks and renditions using available metadata before selecting an alternative.
+- **Provider-aware permissions:** source manifests and service rules may limit quality options, playback or downloads.
+
+A configured source is not automatically a verified working provider. It may require private credentials, account authorization or service-side changes; some integrations may be unavailable. Use only sources and content you are authorized to access.
+
+### Connected services
+
+- **YouTube Music / Google sign-in:** access supported account and profile features.
+- **Spotify integration:** supported library, playlist, Liked Songs and Canvas-related features when the account connection and integration are available. Audio playback still depends on a supported playable source.
+- **Discord Rich Presence:** share current track, artist and progress when connected and enabled.
+- **Last.fm:** scrobbling and now-playing updates, with configurable behaviour.
+- **ListenBrainz:** scrobbling when configured.
+- **Google Cast:** send playback to supported Cast targets.
+- **Listen Together:** party codes/invites, shared listening state and queue coordination through a reachable party server; a custom server can be configured.
+- **SMB and WebDAV:** connect compatible network shares or remote libraries.
+
+All account integrations are optional. Third-party sign-in, API access and server availability are controlled partly by the respective service, not solely by Void Music.
+
+## 🎼 Lyrics, Canvas & personal touches
+
+### Lyrics
+
+- Select between available lyric providers.
+- Display timed lyrics with playback-aware line highlighting and word-level highlighting when provider timing supports it.
+- Adjust lyric timing offset for a track.
+- Translate displayed lyrics on demand into the language selected in the app.
+- Switch between original and translated lyrics without intentionally replacing the original text or its timeline.
+- Create shareable lyric cards where the current lyrics support sharing.
+
+Translation uses an online provider and needs connectivity. Translation timing is an approximate projection from the source lyrics; word boundaries cannot always map perfectly between languages. If a translation request fails, the original lyrics remain the reference.
+
+### Artwork and visual design
+
+- Artwork-colour-driven palettes and mesh-gradient backgrounds.
+- Animated artwork/Canvas sources when available, including supported Spotify, Apple Music and community artwork paths.
+- Artwork-aware player surfaces, frosted-glass styling and Material 3 components.
+- Full-screen and landscape player layouts where the window/device supports them.
+- Artist signature artwork where configured.
+- System, light and dark appearance choices, plus animation and player-display preferences.
+
+## 📥 Downloads, cache & storage
+
+### Download quality
+
+The download quality preference includes these rungs:
+
+| Mode | Behaviour |
 | --- | --- |
-| \`app/\` | Android application, playback, sources, lyrics, downloads and UI |
-| \`shared/\` | Shared models and supporting functionality |
-| \`sharedUi/\` | Shared player and interface components |
-| \`wearos/\` | Companion/watch integration and shared protocol |
-| \`desktopApp/\`, \`desktopUi/\` | Desktop-related project work; see [\`DESKTOP.md\`](DESKTOP.md) for current notes |
-| \`docs/\` | Project documentation and implementation notes |
+| **Standard** | A smaller, standard-quality download where the selected source supports it. |
+| **High** | Prefer the best available source rendition within the supported source path. |
+| **Lossless** | Keep a lossless source file when one is genuinely available; otherwise use the best supported fallback. |
 
-## Support and contributing
+Actual file format and quality depend on the provider and the specific track. Some add-ons explicitly disable downloads; Void Music should respect the source's permission declaration.
 
-Bug reports and feature requests belong in [GitHub Issues](https://github.com/OPZENITSUUU/VoidMusic/issues). Before opening a pull request, please read the project guides:
+Downloads support media metadata/tagging paths for compatible formats, including lyric and FLAC-tag handling where available. Downloaded files and source caches are separate: clearing playback cache should not be confused with deleting the download library.
 
-- [Contributing guide](CONTRIBUTING.md)
-- [Code of conduct](CODE_OF_CONDUCT.md)
-- [Maintainers](MAINTAINERS.md)
-- [Additional documentation and credits](ADDITIONAL.md)
-- [Desktop notes](DESKTOP.md)
+### Add-on prefetch modes
 
-When reporting playback problems, include the app version, Android version, selected source, and relevant **Stats for Nerds** details. Remove account tokens, private source URLs and other secrets from logs before sharing them.
+| Mode | Upcoming add-on tracks | Best for |
+| --- | ---: | --- |
+| **Standard** | 1 | Lower data use and a smaller prefetch footprint. |
+| **Aggressive** | Up to 5 | Preparing more of the queue ahead of transitions. |
 
-## Legal notice
+Prefetch relies on queue contents, source response, storage and network conditions. It can warm up eligible tracks and resolve work earlier, but it cannot promise gap-free playback when a provider is down or a track is unavailable.
 
-Void Music is an independent community distribution and is **not affiliated with or endorsed by Google, YouTube, YouTube Music, Spotify, Discord, TIDAL, Qobuz or their parent companies**. Service names and trademarks belong to their respective owners.
+### Cache and personal libraries
 
-Void Music does not host third-party music catalogues. It acts as a client for supported services, configurable sources and user-provided local/network media. You are responsible for having the rights and authorization required for the content you access or save, and for following applicable law and the terms of any third-party service. Features and source compatibility can change without notice when external services change.
+- Configurable audio-cache storage budget, with automatic least-recently-used eviction.
+- Cached-song view and cache clearing.
+- Local device music with song/artist/album grouping.
+- Supported SMB and WebDAV library access.
+- Download collections, multi-select actions and compatible transfer actions for configured remote storage.
 
-### Upstream attribution
+## 📊 Replay, history & data ownership
 
-This repository builds on the open-source [BitChord](https://github.com/kushagrasinghx/BitChord) project. Upstream licensing, copyright notices and attribution requirements are retained. Void Music's branding and release assets are maintained for this distribution; this does not imply endorsement by the upstream project or any third-party service.
+- **Replay/listening summaries:** browse local listening aggregates across available periods.
+- Listening time and play counts, with track, artist and album summaries and day-level patterns where recorded.
+- Listening history stored on the device by the Replay subsystem.
+- **JSON backup/restore:** export settings and listening data into a file you choose, then restore it on a compatible build.
+- **CSV history export/import:** move listening-history aggregates through a spreadsheet-friendly format.
 
-## License
+For safety, authentication credentials are not included in the ordinary JSON settings backup. CSV is intended for listening history, not account credentials or every app setting. Backups do not package downloaded audio or playback cache, so move those separately if you need them.
 
-This project is distributed under the **GNU General Public License v3.0 (GPL-3.0)**. Read the [\`LICENSE\`](LICENSE) file for the full terms. Redistributions must follow the license's source-availability and notice requirements.
+## 🤝 Listen Together
+
+Listen Together is designed for shared sessions rather than just passing someone a song link.
+
+- Join or create a session using a party code or invitation.
+- Coordinate playback state and queue actions with other participants when the session server is reachable.
+- See supported session/member information in the player.
+- Configure a custom party-server URL and check server connectivity.
+- Share or copy the invite information from the session screen.
+
+The feature depends on a compatible, reachable party server and supported account/session state. Connection failure can interrupt synchronization even if local playback still works.
+
+## 🎨 Settings & customization
+
+Void Music exposes settings so the experience can be tuned to the device and the listener:
+
+- System/light/dark appearance and supported app-language preferences.
+- Home-shelf and home-content visibility options.
+- Playback speed, shuffle/repeat, silence skipping, crossfade and sleep timer.
+- Separate Wi-Fi/mobile audio-quality preferences.
+- Standard/Aggressive add-on prefetch and audio-cache budget.
+- Source ordering, enable/disable state and source health checks.
+- Lyrics provider selection, translation and timing offset.
+- Equalizer, output-route and audio-pipeline options.
+- Player display preferences, including supported artwork and animation choices.
+- Account connections, scrobbling, Rich Presence and Listen Together server settings.
+- Data backup, history export/import and cache management.
+
+Setting availability can vary with app version, operating system, hardware and configured integrations.
+
+## 📱 Platform availability
+
+The repository contains more than one target, but **the current Void Music Releases page publishes the Android APK**. The presence of source code for another platform is not the same thing as a ready-to-download Void Music build.
+
+| Target | What the source includes | Current distribution note |
+| --- | --- | --- |
+| **Android phone/tablet** | Main music app, player, sources, lyrics, library, integrations and downloads. | **Published:** install the APK from the Releases page. |
+| **Android TV / Google TV** | Remote-first home, library, search, settings, full-screen player, synced lyrics, display-refresh-rate options, spatial audio and QR sign-in. | Source target; build instructions below. |
+| **Wear OS companion** | Watch-facing now-playing and playback components connected to the phone app. | Companion source is included; compatibility depends on the paired phone/watch builds. |
+| **Desktop** | Compose Multiplatform desktop code for Windows, Linux and macOS, with desktop playback, local music, lyrics, downloads, equalizer and desktop integrations. | Source target; installers are not attached to the current Void Music Android release. Check branding and updater configuration before distributing a custom desktop build. |
+| **Web player + browser extension** | React/TypeScript web client and Chromium/Firefox extension source, with a page-to-extension bridge. | Development source is included. It is not the Android APK and should be built/deployed separately. |
+
+## ⬇️ Download
+
+<div align="center">
+
+<a href="https://github.com/OPZENITSUUU/VoidMusic/releases/latest/download/Void.Music.apk"><img src="https://img.shields.io/badge/Download-Void.Music.apk-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Download Void.Music.apk" /></a>
+
+**[Open all releases](https://github.com/OPZENITSUUU/VoidMusic/releases)** · **[Report a problem](https://github.com/OPZENITSUUU/VoidMusic/issues)**
+
+</div>
+
+### Install on Android
+
+1. Open the [latest release](https://github.com/OPZENITSUUU/VoidMusic/releases/latest).
+2. Download **Void.Music.apk** from the release assets.
+3. Open the APK. If prompted, allow your browser or file manager to install apps from that source.
+4. Install and open Void Music, then configure the sources and optional services you use.
+
+**Minimum Android version:** Android 8.0 (API 26) or newer.
+
+Android only accepts an in-place update when the package identity and signing certificate are compatible. Back up important data before changing signing tracks or uninstalling an older build. Some older beta packages signed with a different key cannot be upgraded in place.
+
+## 🧑‍💻 Build from source
+
+### Android app
+
+**Requirements:** JDK 17+, Android SDK and the native build components requested by the Gradle project.
+
+<pre><code>git clone https://github.com/OPZENITSUUU/VoidMusic.git
+cd VoidMusic
+./gradlew :app:assemblePersonalDebug</code></pre>
+
+The personal debug APK is created under <code>app/build/outputs/apk/personal/debug/</code>.
+
+Run the corresponding unit tests:
+
+<pre><code>./gradlew :app:testPersonalDebugUnitTest :sharedUi:jvmTest</code></pre>
+
+For an Android TV development build:
+
+<pre><code>./gradlew :tv:assembleProdDebug</code></pre>
+
+The TV module is included when a compatible Android SDK is available.
+
+### Desktop target
+
+The desktop build uses **JDK 21**. With the required platform libraries installed:
+
+<pre><code>./gradlew :desktopApp:run</code></pre>
+
+Desktop packaging uses native tooling for the platform being built. The current Void Music release page should not be assumed to contain desktop installers.
+
+### Web player and browser extension
+
+The web source requires **Node.js 22 or newer**. <code>pnpm</code> is provided via Corepack.
+
+<pre><code>corepack pnpm --dir web install
+corepack pnpm --dir web/app dev</code></pre>
+
+Build the browser extension targets:
+
+<pre><code>corepack pnpm --dir web/extension build</code></pre>
+
+For the full extension setup, browser loading instructions, environment configuration and deployment details, see [web/README.md](web/README.md).
+
+### Keep signing material private
+
+Release builds require a release key and suitable configuration. Signing keystores, passwords, service tokens and private addon URLs must never be committed to the repository. A successful debug build is not proof that a production release has been signed, published or tested on a real device.
+
+## 🧱 Project map
+
+| Directory | Purpose |
+| --- | --- |
+| <code>app/</code> | Android app, playback service, source registry, downloads, settings and platform integrations |
+| <code>shared/</code> | Shared data and supporting logic |
+| <code>sharedUi/</code> | Shared player, lyrics and discovery/library UI |
+| <code>wearos/</code> | Wear OS companion and phone/watch protocol |
+| <code>tv/</code> | Android TV-specific UI and resources |
+| <code>desktopApp/</code> | Desktop application and native platform integration |
+| <code>desktopUi/</code> | UI shared with the desktop target |
+| <code>web/app/</code> | Web player application |
+| <code>web/extension/</code> | Chromium/Firefox companion extension |
+| <code>backend/</code> | Listen Together server implementation and deployment notes |
+| <code>docs/</code> | Design, implementation and platform documentation |
+
+### Built with
+
+- **Kotlin** and **Jetpack Compose / Compose Multiplatform**
+- **AndroidX Media3** for the Android playback/session foundation
+- **Ktor** for supported networking flows
+- **QuickJS** for compatible JavaScript module sources
+- **Native audio components** for extended decoding and audio processing
+- **ONNX Runtime** for on-device Automix analysis paths
+- **React, TypeScript and Vite** for the web source
+
+## 🐛 Support & contributing
+
+Found a bug or have a feature idea? Open a [GitHub Issue](https://github.com/OPZENITSUUU/VoidMusic/issues). Please include:
+
+- App version and device/OS version.
+- What you expected and what actually happened.
+- The selected source and relevant Stats for Nerds details for playback issues.
+- Steps to reproduce, plus a minimal log or screenshot where useful.
+
+Remove passwords, OAuth tokens, private source URLs and other account secrets before posting logs.
+
+Before making a pull request, read the [Contributing Guide](CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), [Maintainers](MAINTAINERS.md) and [Additional Documentation](ADDITIONAL.md).
+
+## ⚖️ Legal, copyright & licensing
+
+Void Music is an independent community distribution. It is **not affiliated with, endorsed by or sponsored by Google, YouTube, YouTube Music, Spotify, Discord, TIDAL, Qobuz or their parent companies**. Product names and trademarks belong to their respective owners.
+
+Void Music does not claim ownership of third-party catalogues or user media. You are responsible for ensuring that your use of any source or content is authorized and complies with local law and the relevant service terms. Availability, stream quality and permissions may change when an external service changes.
+
+This repository builds on the open-source BitChord project. Applicable upstream notices, copyright information and license obligations must be retained when redistributing the software. See [LICENSE](LICENSE) for the repository's **GNU General Public License v3.0 (GPL-3.0)** terms.
 
 ---
 
 <div align="center">
-  <sub>Made for listening, tinkering and making the music experience your own. 🎵</sub>
+
+**Void Music** · A player built for your music, your setup and your way of listening.
+
+<sub>Browse the code · Test the source · Verify the stream · Keep the music yours. 🎧</sub>
+
 </div>
