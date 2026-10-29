@@ -1,160 +1,157 @@
 <div align="center">
+  <img src="Logo.png" alt="Void Music logo" width="144" />
+  <h1>Void Music</h1>
+  <p><strong>Your music. Your flow.</strong></p>
+  <p>A customizable Android music client built around flexible sources, detailed playback controls, synced lyrics and an artwork-driven interface.</p>
 
-<br/>
-<br/>
-
-<img src="Logo.png" alt="Void Music app icon" width="200" />
-
-# Void Music
-
-### Aesthetic YouTube Music Client
-
-<br/>
-
-[![Latest release](https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=0d1117)](https://github.com/OPZENITSUUU/VoidMusic/releases)
-[![License](https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=0d1117)](https://github.com/OPZENITSUUU/VoidMusic/blob/main/LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&labelColor=0d1117)](https://github.com/OPZENITSUUU/VoidMusic/releases)
-[![Listening now](https://api.bitchord.kushagrasingh.in/api/stats/live/badge.svg)](https://api.bitchord.kushagrasingh.in/api/stats/live)
-
-<br/>
-
-[**Download**](#download) · [**Features**](#features) · [**Contributing**](#contributing) · [**Support**](#support) · [**Disclaimer**](#disclaimer)
-
-<br/>
-
-<a href="https://fmhy.net/mobile#youtube-music" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/available/fmhy/cozy.svg" alt="Featured on FMHY" height="55"/></a>
-<a href="https://trendshift.io/repositories/177639?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-177639" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/177639/daily?language=Kotlin" alt="kushagrasinghx%2FBitChord | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/177639?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-177639" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/177639/weekly?language=Kotlin" alt="kushagrasinghx%2FBitChord | Trendshift" width="250" height="55"/></a>
-
-</div>
-
-Void Music is OPZENITSUUU's Android distribution of [BitChord](https://github.com/kushagrasinghx/BitChord). This repository is the official source and release home for Void Music; upstream license and attribution notices are retained.
-
-> [!IMPORTANT]
-> Void Music and BitChord are not affiliated with, endorsed by, or connected to YouTube or Google in any way. Use the app at your own discretion.
-
----
-
-<div align="center">
-
-<img src="Banner.png" alt="Void Music banner" width="100%" />
-
-<h1><a id="features"></a>Features</h1>
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-
-#### Playback
-- **Search, browse and play** anything available on YouTube Music.
-- **Hi-Res lossless audio** — FLAC/ALAC from a configured module source, with YouTube Music as fallback.
-- **Gapless playback with true crossfade**, adjustable 0–12s.
-- **Automix [Beta]** — DJ-style transitions with beat-matching and tempo-stretching.
-- **Offline downloads** — save tracks with embedded metadata.
-- **Local music library** integration.
-- **Background playback** via a proper foreground media session.
-- **Apple-like lyrics animation** — credit to [binimum](https://github.com/binimum/am-lyrics).
-
-#### Connectivity & Accounts
-- **Sign in with your Google account** for personalized content.
-- **Spotify integration** — connect your account to play your playlists and Liked Songs.
-- **Discord Rich Presence** — in-app login, live track/artist/album and progress.
-- **Scrobbling** to Last.fm and ListenBrainz.
-- **Pluggable sources** — add, edit, test and health-check module sources.
-
-    </td>
-    <td width="50%" valign="top">
-
-#### Experience
-- **Animated album canvas** — motion artwork on the now-playing screen.
-- **Word-synced lyrics** — word/syllable-level highlighting from multiple sources.
-- **Lyrics providers** — credit to [lrc.red](https://lrc.red), [BiniLyrics](https://github.com/binimum), [BetterLyrics](https://github.com/better-lyrics/better-lyrics), [PaxSenix](https://lyrics.paxsenix.org), [LyricsPlus](https://github.com/ibratabian17/YouLyPlus), [SimpMusic](https://github.com/maxrave-dev/SimpMusic), [Unison](https://unison.boidu.dev), [Megalobiz](https://www.megalobiz.com), [KuGou](https://www.kugou.com), [LRCLIB](https://lrclib.net), [Musixmatch](https://www.musixmatch.com) and [Genius](https://genius.com).
-- **Dynamic, artwork-driven theming** — Material palette extracted from album art.
-- **Frosted-glass UI** — Telegram-style translucent bars via Haze, Material 3 theming.
-
-#### Controls & Tweaks
-- **Per-network audio quality** — separate quality ceilings for Wi-Fi and mobile data.
-- **Playback speed control** (0.5×–2.0×) and **skip silence**.
-- **Sleep timer** — fixed presets or "stop after this track".
-- **System equalizer** integration.
-- **Stats for nerds** — codec, bit depth, sample rate, and more on the now-playing screen.
-
-    </td>
-  </tr>
-</table>
-
+  <p>
+    <a href="https://github.com/OPZENITSUUU/VoidMusic/releases/latest/download/Void.Music.apk"><img src="https://img.shields.io/badge/Download-Latest%20Android%20APK-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Download latest Android APK" /></a>
+  </p>
+  <p>
+    <a href="https://github.com/OPZENITSUUU/VoidMusic/releases"><img src="https://img.shields.io/github/v/release/OPZENITSUUU/VoidMusic?style=for-the-badge&label=Latest%20release&labelColor=151521" alt="Latest release" /></a>
+    <a href="https://github.com/OPZENITSUUU/VoidMusic/releases"><img src="https://img.shields.io/github/downloads/OPZENITSUUU/VoidMusic/total?style=for-the-badge&label=Downloads&labelColor=151521" alt="Total downloads" /></a>
+    <a href="https://github.com/OPZENITSUUU/VoidMusic/blob/main/LICENSE"><img src="https://img.shields.io/github/license/OPZENITSUUU/VoidMusic?style=for-the-badge&labelColor=151521" alt="License" /></a>
+  </p>
+  <p><a href="#features">Features</a> · <a href="#download">Download</a> · <a href="#build-from-source">Build from source</a> · <a href="#support-and-contributing">Support & contribute</a> · <a href="#legal-notice">Legal notice</a></p>
 </div>
 
 ---
 
+<p align="center">
+  <img src="Banner.png" alt="Void Music visual banner" width="100%" />
+</p>
+
+## About Void Music
+
+Void Music is an Android music client focused on giving listeners more control over discovery, sources, playback and their personal library. Search and play music through supported online sources, bring in local or network music, customize playback behaviour, and keep useful track information close at hand.
+
+The app supports configurable add-on/module sources, but each source is an independent dependency: availability, sign-in requirements, stream formats and download permissions depend on that source and its service.
+
+## Features
+
+### 🎧 Playback & audio controls
+
+- **Online discovery:** search, browse and play available music through the YouTube Music integration.
+- **Playback in the background:** persistent media controls and a playback notification.
+- **Gapless playback and crossfade:** adjustable transitions, including a 0–12 second crossfade range.
+- **Automix (Beta):** beat-aware queue transitions with tempo adjustment where analysis and track data allow.
+- **Flexible controls:** playback speed from 0.5× to 2×, skip silence, sleep timer and system equalizer integration.
+- **Per-network quality settings:** set separate streaming quality limits for Wi-Fi and mobile data.
+- **Stats for Nerds:** inspect selected input details such as codec, sample rate and bit depth from the player.
+- **Automatic best-source selection:** compare available source metadata when selecting a supported alternative rendition.
+
+> **Audio-quality note:** Void Music does not promise that every track will be lossless, Hi-Res or Dolby Atmos. Those formats depend on what a configured source actually supplies, any required authorization, the device's decoder and the selected audio-output route. A source label or bitrate value alone is not proof of bit-perfect output.
+
+### 🔌 Sources & integrations
+
+- Add, edit, test and health-check supported add-on/module sources.
+- Use supported alternate renditions when a configured source can resolve and deliver them.
+- Connect supported Google/YouTube Music and Spotify account features.
+- Scrobble listening activity to Last.fm and ListenBrainz when configured.
+- Show current-track details through Discord Rich Presence when connected.
+- Use Listen Together, supported casting options and network libraries where configured.
+
+External services may change their APIs, authentication requirements or terms. A source appearing in the app does not guarantee that its service is currently available or authorized for every track.
+
+### 📚 Library, downloads & cache
+
+- Play local music alongside supported online sources.
+- Save supported tracks for offline listening with available metadata and tags.
+- Browse cached audio and manage the app's audio-cache storage limit.
+- **Standard add-on cache:** prepare 1 upcoming add-on track.
+- **Aggressive add-on cache:** prepare up to 5 upcoming add-on tracks, where the source and available resources permit it.
+- Work with supported SMB/WebDAV network locations and personal libraries.
+
+Download availability and format depend on the selected source and its permissions. Do not assume that a streaming source allows a track to be saved.
+
+### ✨ Lyrics & interface
+
+- Word-synced lyrics with highlighting when timed lyrics are available.
+- Multiple lyrics providers, with availability varying by track and provider.
+- Artwork-driven colours and animated artwork on the player where supported.
+- Frosted-glass surfaces and a Material 3 interface.
+- Playback queue, track actions, playlists and personal listening features.
+
+## Download
+
 <div align="center">
-
-<h1><a id="download"></a>Download</h1>
-
-<a href="https://github.com/OPZENITSUUU/VoidMusic/releases" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/supported/android/cozy.svg" alt="Download Void Music for Android" height="55"/></a>
-<a href="https://github.com/kushagrasinghx/BitChord/releases" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/supported/windows/cozy.svg" alt="Download for Windows" height="55"/></a>
-
-Grab the latest signed Void Music APK from the [official VoidMusic Releases](https://github.com/OPZENITSUUU/VoidMusic/releases) page. Sideloading requires enabling "Install unknown apps" for whichever app you download it with. Releases signed with the new Void Music key cannot update legacy beta7/beta8 installs in place; back up local app data before choosing to uninstall an older build.
-
-For the Windows and Linux desktop app, see [DESKTOP.md](DESKTOP.md).
-
+  <a href="https://github.com/OPZENITSUUU/VoidMusic/releases/latest/download/Void.Music.apk"><img src="https://img.shields.io/badge/Download-Void.Music.apk-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Download Void Music APK" /></a>
+  <p><a href="https://github.com/OPZENITSUUU/VoidMusic/releases">View all releases and version notes</a></p>
 </div>
+
+**Platform:** Android 8.0 (API 26) or newer. An internet connection is required for online music and third-party services; local playback depends on the files or network locations you select.
+
+### Install
+
+1. Open the [latest release](https://github.com/OPZENITSUUU/VoidMusic/releases/latest) and download **\`Void.Music.apk\`**.
+2. Open the downloaded APK and allow your file manager or browser to install apps from that source if Android asks.
+3. Finish installation, open Void Music and configure any optional accounts or sources you use.
+
+Android only permits an in-place app update when the installed and downloaded APKs use a compatible package identity and signing certificate. Back up important app data before changing builds or uninstalling an existing version.
+
+## Build from source
+
+### Requirements
+
+- A compatible JDK (17 or newer)
+- Android SDK with the platform/build tools required by the Gradle project
+- Android NDK/CMake components requested by the project for native audio components
+
+### Build a development APK
+
+\`\`\`bash
+git clone https://github.com/OPZENITSUUU/VoidMusic.git
+cd VoidMusic
+./gradlew :app:assemblePersonalDebug
+\`\`\`
+
+The development APK is produced under \`app/build/outputs/apk/personal/debug/\`. To run the corresponding unit tests:
+
+\`\`\`bash
+./gradlew :app:testPersonalDebugUnitTest :sharedUi:jvmTest
+\`\`\`
+
+A distributable release must be built and signed with an authorized release key. Signing keys and passwords are intentionally not included in the repository; never commit keystores, signing properties or service secrets.
+
+## Project layout
+
+| Path | Purpose |
+| --- | --- |
+| \`app/\` | Android application, playback, sources, lyrics, downloads and UI |
+| \`shared/\` | Shared models and supporting functionality |
+| \`sharedUi/\` | Shared player and interface components |
+| \`wearos/\` | Companion/watch integration and shared protocol |
+| \`desktopApp/\`, \`desktopUi/\` | Desktop-related project work; see [\`DESKTOP.md\`](DESKTOP.md) for current notes |
+| \`docs/\` | Project documentation and implementation notes |
+
+## Support and contributing
+
+Bug reports and feature requests belong in [GitHub Issues](https://github.com/OPZENITSUUU/VoidMusic/issues). Before opening a pull request, please read the project guides:
+
+- [Contributing guide](CONTRIBUTING.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Maintainers](MAINTAINERS.md)
+- [Additional documentation and credits](ADDITIONAL.md)
+- [Desktop notes](DESKTOP.md)
+
+When reporting playback problems, include the app version, Android version, selected source, and relevant **Stats for Nerds** details. Remove account tokens, private source URLs and other secrets from logs before sharing them.
+
+## Legal notice
+
+Void Music is an independent community distribution and is **not affiliated with or endorsed by Google, YouTube, YouTube Music, Spotify, Discord, TIDAL, Qobuz or their parent companies**. Service names and trademarks belong to their respective owners.
+
+Void Music does not host third-party music catalogues. It acts as a client for supported services, configurable sources and user-provided local/network media. You are responsible for having the rights and authorization required for the content you access or save, and for following applicable law and the terms of any third-party service. Features and source compatibility can change without notice when external services change.
+
+### Upstream attribution
+
+This repository builds on the open-source [BitChord](https://github.com/kushagrasinghx/BitChord) project. Upstream licensing, copyright notices and attribution requirements are retained. Void Music's branding and release assets are maintained for this distribution; this does not imply endorsement by the upstream project or any third-party service.
+
+## License
+
+This project is distributed under the **GNU General Public License v3.0 (GPL-3.0)**. Read the [\`LICENSE\`](LICENSE) file for the full terms. Redistributions must follow the license's source-availability and notice requirements.
 
 ---
 
 <div align="center">
-
-<h1><a id="contributing"></a>Contributing</h1>
-
-We welcome contributions to Void Music! Please review the retained upstream [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a Pull Request.
-
-[**Contributing Guide**](CONTRIBUTING.md) · [**Code of Conduct**](CODE_OF_CONDUCT.md) · [**Maintainers**](MAINTAINERS.md) · [**Additional Docs**](ADDITIONAL.md)
-
-### Thanks to all contributors ❤
-
-<a href="https://github.com/kushagrasinghx/BitChord/graphs/contributors">
-  <img src="https://raw.githubusercontent.com/kushagrasinghx/BitChord/contributors/contributors.svg" />
-</a>
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="support"></a>Support</h1>
-
-Void Music is a community distribution of BitChord. The links below support the upstream BitChord maintainers:
-
-<a href="https://ko-fi.com/kushagrasinghx" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/kofi-singular-alt/cozy.svg" alt="Support me on Ko-fi" height="55"/></a>
-<a href="https://paypal.me/kuxhagrasingh" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/paypal-plural/cozy.svg" alt="Support us on PayPal" height="55"/></a>
-
-<br/>
-<img src="upi_support.jpg" alt="UPI Support" width="250" />
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="disclaimer"></a>Disclaimer & Legal Notice</h1>
-
-Void Music is an independent Android distribution based on the open-source BitChord project. It is **not** associated with Google LLC, YouTube Music, Deezer, Telegram, or any of their parent companies.
-
-* **No Media Hosting:** BitChord does not host, upload, or store copyrighted music files. It operates strictly as an interface to scan local device storage or stream media directly from public, public-facing, or user-authenticated APIs.
-* **Fair Use & API Usage:** This software is created solely for personal research, educational, and fair-use purposes. The user is entirely responsible for ensuring their usage aligns with their local copyright laws and YouTube Terms of Service.
-* **No Ad-Blocking Guarantee:** While BitChord focuses on providing a clean listening environment, it does not guarantee permanent bypasses or modifications to commercial third-party platform conditions.
-* **Copyleft:** BitChord is free software under the GPLv3. The license does not let anyone forbid others from selling or redistributing copies, but any distribution must come with the Corresponding Source under the same license.
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="license"></a>License</h1>
-
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for details.
-
+  <sub>Made for listening, tinkering and making the music experience your own. 🎵</sub>
 </div>
