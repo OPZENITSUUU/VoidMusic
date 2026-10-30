@@ -565,6 +565,10 @@ private fun DownloadRow(song: Song, palette: ArtworkPalette, isOffline: Boolean,
         value = Downloads.savedUri(context, song.videoId)
     }
 
+    val needsQualityUpgrade by produceState(false, song.videoId, file) {
+        value = file != null && Downloads.needsQualityUpgrade(context, song.videoId)
+    }
+
     // A failure is worth stating once. Leaving it set would have the row still
     // reporting last week's dead connection the next time the sheet is opened.
     DisposableEffect(song.videoId) {
@@ -601,13 +605,24 @@ private fun DownloadRow(song: Song, palette: ArtworkPalette, isOffline: Boolean,
         )
 
         null -> if (file != null) {
-            ActionRow(
-                icon = Icons.Rounded.DownloadDone,
-                label = stringResource(R.string.saved_to_downloads),
-                value = stringResource(R.string.delete),
-                tint = palette.accent,
-                accent = palette.accent,
-            ) { scope.launch { Downloads.delete(context, song.videoId) } }
+            Column {
+                ActionRow(
+                    icon = Icons.Rounded.DownloadDone,
+                    label = stringResource(R.string.saved_to_downloads),
+                    value = stringResource(R.string.delete),
+                    tint = palette.accent,
+                    accent = palette.accent,
+                ) { scope.launch { Downloads.delete(context, song.videoId) } }
+                if (needsQualityUpgrade) {
+                    ActionRow(
+                        icon = Icons.Rounded.HighQuality,
+                        label = "Replace with highest available quality",
+                        value = "Upgrade",
+                        tint = palette.accent,
+                        accent = palette.accent,
+                    ) { Downloads.enqueueUpgrade(context, song) }
+                }
+            }
         } else if (!isOffline) {
             ActionRow(
                 icon = Icons.Rounded.Download,
