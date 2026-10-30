@@ -601,7 +601,9 @@ private fun DownloadRow(song: Song, palette: ArtworkPalette, isOffline: Boolean,
             // failure whatever the sleeve happens to be tinted.
             tint = MaterialTheme.colorScheme.error,
             accent = MaterialTheme.colorScheme.error,
-            onClick = onDownload,
+            onClick = {
+                if (file != null) Downloads.enqueueUpgrade(context, song) else onDownload()
+            },
         )
 
         null -> if (file != null) {
