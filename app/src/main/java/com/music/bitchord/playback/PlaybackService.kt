@@ -5777,9 +5777,11 @@ class PlaybackService : MediaLibraryService() {
                 Pair((format.averageBitrate + 500) / 1000, TelemetryProvenance.SOURCE_REPORTED)
             format?.bitrate != null && format.bitrate > 0 ->
                 Pair((format.bitrate + 500) / 1000, TelemetryProvenance.SOURCE_REPORTED)
-            mediaId != null && localBitrateCache.containsKey(mediaId) ->
+            mediaId != null && isLocalPlayback(mediaId, player.currentMediaItem) &&
+                localBitrateCache.containsKey(mediaId) ->
                 Pair(localBitrateCache[mediaId], TelemetryProvenance.SOURCE_REPORTED)
-            mediaId != null && localAverageBitrateCache.containsKey(mediaId) ->
+            mediaId != null && isLocalPlayback(mediaId, player.currentMediaItem) &&
+                localAverageBitrateCache.containsKey(mediaId) ->
                 Pair(localAverageBitrateCache[mediaId], TelemetryProvenance.DERIVED)
             NerdStats.declaredFormat(mediaId)?.kbps != null ->
                 Pair(NerdStats.declaredFormat(mediaId)?.kbps, TelemetryProvenance.SOURCE_REPORTED)
