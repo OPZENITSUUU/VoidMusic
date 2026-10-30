@@ -21,28 +21,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * Whether a stream started under this ceiling may be served by [kind].
  *
  * Asked per stream rather than written into
- * [SourceConfig.enabled][com.music.bitchord.data.sources.SourceConfig.enabled],
- * which is what this used to do — an `applyQualityPreset` call flipped the
- * module and JioSaavn switches the moment a rung was picked. Two things
- * were wrong with that and both were reported together: picking a rung for
- * *mobile data* turned the sources off while sitting on Wi-Fi, and nothing
- * turned them back on when the connection changed, so a Wi-Fi ceiling of
- * Lossless still had no lossless source to reach. A ceiling is a property
- * of the connection in force; the switches on the Sources screen are the
- * user's standing choice. Storing the first in the second lost the second.
+ * [SourceConfig.enabled][com.music.bitchord.data.sources.SourceConfig.enabled]:
+ * these are network-quality choices, not permanent source opt-outs.
  *
- * [SourceKind.YOUTUBE] is permitted on every rung: it is what [maxKbps]
- * caps, and it is the only source that can answer at all when the ones
- * above it are skipped.
+ * Add-ons stay eligible at every network-quality setting. SourceResolver asks
+ * enabled add-ons for their best/lossless tier because they are the explicit
+ * high-quality alternatives to YouTube; this can use more data than the Low
+ * ceiling. The selected ceiling continues to govern YouTube and other sources.
  */
 fun AudioQuality.permits(kind: SourceKind): Boolean = when (this) {
     AudioQuality.LOSSLESS -> true
-    // No lossless answer is wanted here, and a source that can serve one is
-    // the slow half of the list: an addon fronting several catalogues walks
-    // all of them before it answers, which is seconds spent to land on a
-    // transcode JioSaavn already has at 320.
-    AudioQuality.HIGH -> !kind.canServeLossless
-    AudioQuality.MEDIUM, AudioQuality.LOW -> kind == SourceKind.YOUTUBE
+    AudioQuality.HIGH -> kind == SourceKind.ADDON || !kind.canServeLossless
+    AudioQuality.MEDIUM -> kind == SourceKind.ADDON || kind == SourceKind.YOUTUBE
+    AudioQuality.LOW -> kind == SourceKind.YOUTUBE || kind == SourceKind.ADDON
 }
 
 /**
@@ -74,7 +65,7 @@ enum class AddonCacheMode(val upcomingTrackLimit: Int) {
  *
  * Deliberately not [AudioQuality]. That enum budgets a *stream*, and is priced
  * per hour because the same bytes are spent again on every replay. A download is
- * the opposite trade — paid for once, kept, played from disk forever after — so
+ * the opposite trade â paid for once, kept, played from disk forever after â so
  * the figure that decides it is what one track costs, and the rung worth
  * defaulting to is the top one rather than the cheap one.
  *
@@ -95,7 +86,7 @@ enum class DownloadQuality(
     /** Whether a source's bit-exact file is worth keeping, or a transcode will do. */
     val keepsLossless: Boolean,
 ) {
-    STANDARD(128, "Standard", "~128 kbps Opus · fits more on the device", "~4 MB", false),
+    STANDARD(128, "Standard", "~128 kbps Opus Â· fits more on the device", "~4 MB", false),
     HIGH(Int.MAX_VALUE, "High", "Best audio on offer; source quality first", "~8 MB", false),
     LOSSLESS(
         Int.MAX_VALUE,
@@ -143,11 +134,11 @@ enum class LocalMusicSort {
 }
 
 /**
- * Ordering for the track list on an album or playlist page — the same idea as
+ * Ordering for the track list on an album or playlist page â the same idea as
  * the Downloads folder's sort, with a date option for the one thing a
  * catalogue row can still be dated by: the position it sits at. A playlist's
- * running order is the order songs were added in — YouTube Music appends each
- * addition at the foot — so read backwards it *is* a date order, newest first.
+ * running order is the order songs were added in â YouTube Music appends each
+ * addition at the foot â so read backwards it *is* a date order, newest first.
  * DetailScreen.kt holds the sort itself. Persisted app-wide rather than per
  * page: one choice, kept until the user makes another.
  */
@@ -163,18 +154,18 @@ enum class SongSort {
  * App settings, backed by SharedPreferences and exposed as flows.
  *
  * PlaybackService runs in the same process as the UI, so it observes these
- * same flows and applies changes to the live ExoPlayer instance immediately —
+ * same flows and applies changes to the live ExoPlayer instance immediately â
  * no restart, no rebinding.
  */
 object AppSettings {
 
     private lateinit var prefs: SharedPreferences
 
-    /** Only for the Discord, WebDAV and SMB secrets — everything else on here is plain prefs. */
+    /** Only for the Discord, WebDAV and SMB secrets â everything else on here is plain prefs. */
     private lateinit var authStore: AuthStore
 
     /**
-     * Quality ceilings, one per kind of connection — the point of the split is
+     * Quality ceilings, one per kind of connection â the point of the split is
      * that Wi-Fi can stay on Lossless while mobile data is capped. Both
      * default to Lossless; the mobile plan is the user's to budget, not ours
      * to assume.
@@ -192,7 +183,7 @@ object AppSettings {
      *
      * Kept apart from the two ceilings above on purpose. Those are about what
      * this minute's connection costs, and a download outlives the minute it was
-     * started in — capping a permanent file at whichever network happened to be
+     * started in â capping a permanent file at whichever network happened to be
      * in hand bakes a temporary decision into a lasting artefact, and the
      * reverse (a High ceiling on Wi-Fi implying 35MB FLACs of everything) is
      * just as wrong in the other direction.
@@ -217,8 +208,8 @@ object AppSettings {
      * On by default, and that is a deliberate change of behaviour for anyone
      * updating. [downloadQuality] defaulting to Lossless means a tap that used
      * to spend four megabytes of mobile data can now spend thirty-five, and of
-     * the two ways to get that wrong — silently overspending a data plan, or
-     * refusing with a sentence naming the switch that would allow it — only the
+     * the two ways to get that wrong â silently overspending a data plan, or
+     * refusing with a sentence naming the switch that would allow it â only the
      * second is recoverable by the person it happens to.
      */
     val wifiOnlyDownloads = MutableStateFlow(true)
@@ -247,7 +238,7 @@ object AppSettings {
      * Lets Automix's analyzer decide the transition's timing and length
      * from each track's tempo, energy and structure, replacing the fixed
      * [crossfadeSeconds] window rather than needing it set to anything first
-     * — [crossfadeSeconds] only matters here as a fallback while a pair is
+     * â [crossfadeSeconds] only matters here as a fallback while a pair is
      * still being analysed. Off by default: analysis costs a background
      * decode per track.
      *
@@ -267,13 +258,13 @@ object AppSettings {
 
     /**
      * Level every track to the same loudness, using YouTube's own
-     * normalization figure for it — see
+     * normalization figure for it â see
      * [com.music.bitchord.playback.PlaybackService.setupLoudnessEnhancer].
      *
      * On by default, which is the one genuinely contentious thing about it.
      * The case for it: a queue drawn from several sources is a queue of
      * several mastering eras, and the gap between a 1980s CD transfer and a
-     * modern master is routinely fifteen decibels — loud enough that the
+     * modern master is routinely fifteen decibels â loud enough that the
      * listener's own volume control is the wrong tool, because the setting
      * that suits one track hurts at the next. Every streaming service
      * normalizes by default for the same reason.
@@ -298,14 +289,14 @@ object AppSettings {
      * subscription for.
      *
      * Off is a real preference and not just a safety valve. Atmos is E-AC-3,
-     * which is *lossy* — a track with an Atmos master is frequently also held
+     * which is *lossy* â a track with an Atmos master is frequently also held
      * as a FLAC, and someone listening on wired headphones may well prefer the
      * bit-exact stereo copy to a spatial mix their output can't render. Turning
      * this off is how they say so; see
      * [ModuleSource.unplayable][com.music.bitchord.data.sources.ModuleSource],
      * which is where the refusal is applied.
      *
-     * Independent of whether the device *can* decode it — that question is
+     * Independent of whether the device *can* decode it â that question is
      * [DeviceCodecs.playsDolbyAtmos][com.music.bitchord.data.sources.DeviceCodecs],
      * and the two are deliberately not folded together: this one is the
      * listener's answer, is persisted, and must survive being read on a phone
@@ -317,7 +308,7 @@ object AppSettings {
     /**
      * Widens stereo output via [com.music.bitchord.playback.SpatialAudioProcessor],
      * a stereo widening + cross-feed effect running inside ExoPlayer's own
-     * pipeline. Not true object-based spatial audio — YouTube only ever hands
+     * pipeline. Not true object-based spatial audio â YouTube only ever hands
      * us a stereo stream, so there's no Atmos-style source to render.
      */
     val spatialAudio = MutableStateFlow(false)
@@ -326,9 +317,9 @@ object AppSettings {
      * The app's own equaliser, master switch.
      *
      * Separate from the system equaliser row beside it, which is still there and
-     * still opens the device's panel. The two stack rather than compete — this
+     * still opens the device's panel. The two stack rather than compete â this
      * one runs inside ExoPlayer before the sink, that one hangs off the audio
-     * session after it — so someone who prefers their OEM's can leave this off
+     * session after it â so someone who prefers their OEM's can leave this off
      * and lose nothing.
      */
     val equalizerEnabled = MutableStateFlow(false)
@@ -354,8 +345,8 @@ object AppSettings {
     /**
      * Which preset the bands currently are, or [EqualizerPreset.CUSTOM].
      *
-     * Derived from [equalizerBands] rather than independent of it — see
-     * [setEqualizerBands] — so a slider dragged back to where a preset left it
+     * Derived from [equalizerBands] rather than independent of it â see
+     * [setEqualizerBands] â so a slider dragged back to where a preset left it
      * makes the row say that preset's name again instead of "Custom" forever.
      */
     val equalizerPreset = MutableStateFlow(EqualizerPreset.FLAT)
@@ -370,7 +361,7 @@ object AppSettings {
     /** Whether the queue is held in shuffled order (Mix button). */
     val shuffleEnabled = MutableStateFlow(false)
 
-    /** Repeat mode for the player — Off, All, or One. */
+    /** Repeat mode for the player â Off, All, or One. */
     val repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
 
     /** Put the playing track's codec, bitrate and sample rate on the player. */
@@ -382,7 +373,7 @@ object AppSettings {
     /**
      * Whether the welcome pages (party name, then YouTube sign-in) have been
      * through. Absent rather than true for anyone updating from a build that
-     * had no onboarding, so they get it once too — they have no party name yet.
+     * had no onboarding, so they get it once too â they have no party name yet.
      */
     val onboardingComplete = MutableStateFlow(false)
 
@@ -437,7 +428,7 @@ object AppSettings {
     /**
      * Which language the lyrics translate button translates *into*.
      *
-     * Blank — the default — means "whatever the app is set to", and is stored
+     * Blank â the default â means "whatever the app is set to", and is stored
      * as blank rather than resolved once: someone who has never touched this
      * has expressed no preference, and switching the app to Spanish should
      * carry their lyrics with it rather than leaving them on the English they
@@ -447,10 +438,10 @@ object AppSettings {
 
     /**
      * Plays a looping video behind the cover art on the player when one is
-     * published for the track — Spotify's Canvas, Apple's motion artwork.
+     * published for the track â Spotify's Canvas, Apple's motion artwork.
      *
      * Costs a video stream on top of the audio one and reaches three
-     * services that have nothing to do with playback, so it stays a switch —
+     * services that have nothing to do with playback, so it stays a switch â
      * but it is the better default, and most tracks resolve to no canvas at
      * all. See [CanvasRepository][com.music.bitchord.data.canvas.CanvasRepository].
      */
@@ -463,8 +454,8 @@ object AppSettings {
      *
      * Off by default. A canvas clip loops for as long as its track plays,
      * and every loop past the first re-fetches the same few seconds of video
-     * — see [CanvasCache][com.music.bitchord.data.canvas.CanvasCache] for why
-     * that costs network at all rather than being answered from a buffer —
+     * â see [CanvasCache][com.music.bitchord.data.canvas.CanvasCache] for why
+     * that costs network at all rather than being answered from a buffer â
      * so a few-second clip behind a four-minute track on cellular is not a
      * flat video cost, it is that cost repeated dozens of times per song.
      * That is the shape of the reported 8GB day: still art costs nothing
@@ -481,7 +472,7 @@ object AppSettings {
     /**
      * Secondary artist art: a user-hosted artist-signature API used only when
      * Apple Music has no title logo. Blank URL means unconfigured and the
-     * lookup is skipped entirely — there is no hosted default.
+     * lookup is skipped entirely â there is no hosted default.
      */
     val signatureApiEnabled = MutableStateFlow(false)
     val signatureApiUrl = MutableStateFlow("")
@@ -493,7 +484,7 @@ object AppSettings {
      * The treatment motion artwork has always had, applied to still sleeves too.
      * Off restores the card: the sleeve keeps its corners, its shadow and its
      * shrink-while-paused, and only a clip goes full-bleed. Phones only either
-     * way — see the hero notes in
+     * way â see the hero notes in
      * [NowPlayingScreen][com.music.bitchord.ui.player.NowPlayingScreen].
      */
     val fullBleedArtwork = MutableStateFlow(true)
@@ -504,7 +495,7 @@ object AppSettings {
      * the sleeve's bottom edge.
      *
      * Off by default, because the current backdrop replaced it for two reasons
-     * that have not gone away — see [ArtworkMesh][com.music.bitchord.ui.player.ArtworkMesh]
+     * that have not gone away â see [ArtworkMesh][com.music.bitchord.ui.player.ArtworkMesh]
      * for the colour one (a cover that is nine-tenths black with a red stripe
      * comes back from the quantiser as a red screen) and
      * [ArtworkMeshBackdrop][com.music.bitchord.ui.player.ArtworkMeshBackdrop]
@@ -521,7 +512,7 @@ object AppSettings {
     /**
      * Time-synced lyrics on the player, lit up as they are sung.
      *
-     * On by default — it is most of the point of the player screen — but it
+     * On by default â it is most of the point of the player screen â but it
      * reaches third-party lyric databases for every track played, so it stays
      * a switch, and [lyricsSources] narrows which of them get asked.
      */
@@ -531,11 +522,11 @@ object AppSettings {
     val lyricsSources = MutableStateFlow(LyricsSource.offered.toSet())
 
     /**
-     * The order [lyricsSources] are asked in — see [LyricsRepository][com.music.bitchord.data.lyrics.LyricsRepository]:
+     * The order [lyricsSources] are asked in â see [LyricsRepository][com.music.bitchord.data.lyrics.LyricsRepository]:
      * every enabled source is asked at once, but a higher-priority one still
      * pending is never preempted by a lower one that happened to answer first.
      * Reordered from Settings, so this is a full permutation of
-     * [LyricsSource.offered] rather than a subset — enabling and ordering are
+     * [LyricsSource.offered] rather than a subset â enabling and ordering are
      * independent choices.
      */
     val lyricsSourceOrder = MutableStateFlow<List<LyricsSource>>(LyricsSource.offered)
@@ -544,7 +535,7 @@ object AppSettings {
      * Off, the highest-priority source to answer at all is taken as the
      * lyrics, word-synced or not. On, a merely line-synced answer is held as
      * a fallback while the rest of [lyricsSourceOrder] is still checked for a
-     * word-synced one — worth the extra network calls to some, not to others,
+     * word-synced one â worth the extra network calls to some, not to others,
      * which is why it defaults off rather than being how [LyricsRepository]
      * always behaved.
      */
@@ -563,28 +554,28 @@ object AppSettings {
     val addonCacheMode = MutableStateFlow(AddonCacheMode.STANDARD)
 
     /**
-     * Whether Library's "On device" shelf carries the Cached songs folder —
+     * Whether Library's "On device" shelf carries the Cached songs folder â
      * the YouTube and JioSaavn tracks the song cache is holding. Off by
      * default: the cache is an implementation detail most people never need
      * to look inside.
      */
     val showCacheFolder = MutableStateFlow(false)
 
-    // ── Replay ──────────────────────────────────────────────────────────────
+    // ââ Replay ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
     /**
      * Whether Replay may work out a genre chart.
      *
      * Its own switch because it is the one part of Replay that isn't purely
      * local: everything else on that page is counted on this device and never
-     * leaves it, while a genre has to be looked up by artist name — see
+     * leaves it, while a genre has to be looked up by artist name â see
      * [ArtistFacts][com.music.bitchord.data.stats.ArtistFacts]. On by default,
      * since it sends a name and nothing else and the answer is what makes a
      * quarter of the page exist; off, the genre chart simply isn't drawn.
      */
     val replayGenres = MutableStateFlow(true)
 
-    // ── Library ─────────────────────────────────────────────────────────────
+    // ââ Library âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
     /** Hides short clips, recorder output and non-music formats from Local Music. */
     val filterNonMusicAudio = MutableStateFlow(true)
@@ -598,7 +589,7 @@ object AppSettings {
     val librarySort = MutableStateFlow(LibrarySort.DEFAULT)
 
     /**
-     * Each album/playlist page's track-list order, keyed by browse id —
+     * Each album/playlist page's track-list order, keyed by browse id â
      * Spotify-style, every page keeps its own. A page never touched reads as
      * [SongSort.DEFAULT].
      */
@@ -607,21 +598,21 @@ object AppSettings {
     /** Empty means every MediaStore folder; otherwise this is a persisted SAF tree URI. */
     val localMusicFolderUri = MutableStateFlow("")
 
-    // ── WebDAV ────────────────────────────────────────────────────────────
+    // ââ WebDAV ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
     /**
      * Remote music library over WebDAV (e.g. Nextcloud's Music folder).
      *
      * The URL and username live in plain prefs like every other setting; the
      * password is mirrored out of [AuthStore] so it stays encrypted at rest
-     * and out of backup exports — see [exportPrefs]. Empty URL means
+     * and out of backup exports â see [exportPrefs]. Empty URL means
      * unconfigured, and the library simply reads as empty.
      */
     val webdavUrl = MutableStateFlow("")
     val webdavUsername = MutableStateFlow("")
     val webdavPassword = MutableStateFlow("")
 
-    // ── SMB ───────────────────────────────────────────────────────────────
+    // ââ SMB âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
     /**
      * Remote music library on an SMB file share (a NAS, a Windows box).
@@ -641,7 +632,7 @@ object AppSettings {
      * Browse ids of the playlists pinned to the top of the Library tab, in the
      * order they were pinned.
      *
-     * A [List] rather than a [Set]: pin order is part of what a pin means here —
+     * A [List] rather than a [Set]: pin order is part of what a pin means here â
      * the whole point is a small, hand-picked front row, and a set would leave
      * that order to hash iteration. Capped at [MAX_PINNED_PLAYLISTS] by
      * [togglePinnedPlaylist], the only way this is ever written.
@@ -651,7 +642,7 @@ object AppSettings {
     /** How many playlists [pinnedPlaylists] can hold at once. */
     const val MAX_PINNED_PLAYLISTS = 5
 
-    // ── Scrobbling ──────────────────────────────────────────────────────
+    // ââ Scrobbling ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
     /** One release gate shared by the settings UI and the playback service. */
     val scrobblingAvailable = true
@@ -673,14 +664,14 @@ object AppSettings {
     val listenBrainzPrimaryArtistOnly = MutableStateFlow(false)
     val spotifySpdcToken = MutableStateFlow("")
 
-    // ── Discord Rich Presence ───────────────────────────────────────────
+    // ââ Discord Rich Presence âââââââââââââââââââââââââââââââââââââââââââ
 
     /**
      * The connected Discord account's token, mirrored out of [AuthStore] so
      * [PlaybackService][com.music.bitchord.playback.PlaybackService] can pick
      * up a login without polling for one. Empty means not connected.
      *
-     * Only the mirror is here — the persisted copy is encrypted, because unlike
+     * Only the mirror is here â the persisted copy is encrypted, because unlike
      * a scrobbler key this one is the account itself.
      */
     val discordToken = MutableStateFlow("")
@@ -724,7 +715,7 @@ object AppSettings {
 
     /**
      * True only while a Automix transition that is actually *mixing* is
-     * audible — one that beat-matched, cued the incoming track into its
+     * audible â one that beat-matched, cued the incoming track into its
      * arrangement, or rode a filter.
      *
      * Deliberately not "a crossfade is running". The fallback case, where
@@ -736,7 +727,7 @@ object AppSettings {
     val smartMixInProgress = MutableStateFlow(false)
 
     /**
-     * The Automix blend in flight — its progress and the beat it runs on — or
+     * The Automix blend in flight â its progress and the beat it runs on â or
      * null between blends. Published by the crossfade controller every fade
      * tick; read it in draw, not in composition.
      */
@@ -745,7 +736,7 @@ object AppSettings {
     /**
      * True while a version switch is fetching and analysing the other cut
      * before playback actually moves. Drains into the loading bar drawn along
-     * the scrubber itself — `ThinSlider.loading` — so the wait reads as work
+     * the scrubber itself â `ThinSlider.loading` â so the wait reads as work
      * in progress rather than as a player frozen on a version that is about to
      * change, and lights the toggle button's spinner through the half of the
      * switch that has nothing else showing.
@@ -771,7 +762,7 @@ object AppSettings {
 
     /**
      * A temporary cap on [effectiveAudioQuality], for as long as something other
-     * than this phone's own speaker is playing — the BitChord watch app, whose
+     * than this phone's own speaker is playing â the BitChord watch app, whose
      * audio goes over a Bluetooth link that cannot keep up with lossless. Never
      * persisted, never shown: the listener's own settings are untouched, and
      * apply again the moment the phone takes the music back.
@@ -1001,13 +992,13 @@ object AppSettings {
 
     /**
      * True the first time this is called after [currentVersionCode] rises above
-     * whatever was last recorded — i.e. once per update, on the first launch
+     * whatever was last recorded â i.e. once per update, on the first launch
      * after it installs. A fresh install has nothing to compare against, so
      * the very first call seeds the stored value from [currentVersionCode]
      * rather than reporting an update.
      *
      * BitChord ships sideloaded (see [com.music.bitchord.data.AppUpdateChecker]),
-     * so installing a new APK over the old one is the only "update" there is —
+     * so installing a new APK over the old one is the only "update" there is â
      * app data, this pref included, survives it exactly like a Play Store
      * update. Call once per process start, before anything reads a cache that
      * an update should invalidate.
@@ -1048,7 +1039,7 @@ object AppSettings {
      * a download quietly turned on the lossless preference and off again with
      * it. Someone who switched that off on the Sources screen was getting AAC
      * downloads on purpose, and defaulting them to Lossless now would answer a
-     * question they had already answered — with thirty-five megabytes a track.
+     * question they had already answered â with thirty-five megabytes a track.
      *
      * The ceilings are deliberately *not* consulted. They were only in that
      * derivation because there was nowhere else to say "not on mobile data",
@@ -1385,7 +1376,7 @@ object AppSettings {
 
     /**
      * Stored as a joined list of names rather than a string set: a name that
-     * no longer exists — a source dropped in a later build — has to fall out
+     * no longer exists â a source dropped in a later build â has to fall out
      * quietly, and the default when nothing has been saved is "all of them",
      * which a missing key and an empty set would otherwise be unable to tell
      * apart.
@@ -1395,7 +1386,7 @@ object AppSettings {
      * chosen from; a new one was never on it, so its absence says nothing, and
      * treating it as "off" would ship a source nobody could discover without
      * first going and looking for it. [KEY_LYRICS_SOURCES_SEEN] is what makes
-     * the two cases distinguishable — before it existed, [LEGACY_SOURCES]
+     * the two cases distinguishable â before it existed, [LEGACY_SOURCES]
      * stands in as the list of everything there was to have an opinion about.
      */
     private fun readLyricsSources(): Set<LyricsSource> {
@@ -1433,8 +1424,8 @@ object AppSettings {
     }
 
     /**
-     * A named source dropped from the stored order — an upgrade removed or
-     * hid it since it was saved — falls out on read; one added since slots in
+     * A named source dropped from the stored order â an upgrade removed or
+     * hid it since it was saved â falls out on read; one added since slots in
      * after its declared neighbour (see [LyricsSource.ordered]), so a fresh
      * install and an upgraded one agree on where a new source lands until the
      * user says otherwise.
@@ -1461,7 +1452,7 @@ object AppSettings {
 
     /**
      * Puts the source list, its order and [prioritizeSyllableSync] back the
-     * way a fresh install finds them. [syncedLyrics] itself is left alone —
+     * way a fresh install finds them. [syncedLyrics] itself is left alone â
      * this is "start over on *which* lyrics", not "turn lyrics off".
      */
     fun resetLyricsSourceSettings() {
@@ -1519,7 +1510,7 @@ object AppSettings {
     }
 
     /**
-     * Clamped to [DEFAULT_CACHE_LIMIT_BYTES]..[MAX_CACHE_LIMIT_BYTES] — the floor is the default, not zero.
+     * Clamped to [DEFAULT_CACHE_LIMIT_BYTES]..[MAX_CACHE_LIMIT_BYTES] â the floor is the default, not zero.
      * Anything past [MAX_CACHE_LIMIT_BYTES] is [UNLIMITED_CACHE_LIMIT_BYTES].
      */
     fun setAudioCacheLimitBytes(value: Long) {
@@ -1925,7 +1916,7 @@ object AppSettings {
         setDiscordAccount("", "", null)
     }
 
-    // ── Backup ──────────────────────────────────────────────────────────────
+    // ââ Backup ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
     /**
      * Every stored preference, for an export.
@@ -1940,7 +1931,7 @@ object AppSettings {
      * a minute; a leaked session key is not recoverable at all.
      *
      * The Discord token is not here for the same reason and one more: it never
-     * reaches this file. It lives in the encrypted store — see [AuthStore] — and
+     * reaches this file. It lives in the encrypted store â see [AuthStore] â and
      * so does the YouTube cookie, which means neither can be exported by
      * accident.
      */
@@ -1954,7 +1945,7 @@ object AppSettings {
      *
      * A replace, not a merge: a partial restore leaves a device holding half of
      * one configuration and half of another, which is the one outcome nobody
-     * asked for. Keys in [SECRETS] survive untouched — they were never in the
+     * asked for. Keys in [SECRETS] survive untouched â they were never in the
      * file being restored from, and clearing them would sign the user out of
      * services the backup has nothing to say about.
      */
@@ -1980,7 +1971,7 @@ object AppSettings {
     }
 
     /**
-     * Preferences an export must not carry — credentials, not configuration.
+     * Preferences an export must not carry â credentials, not configuration.
      * See [exportPrefs].
      */
     private val SECRETS = setOf(
@@ -2000,7 +1991,7 @@ object AppSettings {
      * what is saved in this same preference file, and that record is a list of
      * files on this phone's storage. Carrying it into a backup would restore a
      * folder full of tracks that are not here; clearing it on import would leave
-     * the files on disk with nothing pointing at them, which is worse — the
+     * the files on disk with nothing pointing at them, which is worse â the
      * Downloads page would read as empty while the space stayed used.
      */
     private val DEVICE_LOCAL = setOf(

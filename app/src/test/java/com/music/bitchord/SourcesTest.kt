@@ -6,6 +6,8 @@ import com.music.bitchord.data.jiosaavn.prioritizeExplicit
 import com.music.bitchord.data.jiosaavn.selectBestSaavnStream
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.settings.AudioQuality
+import com.music.bitchord.data.settings.permits
 import com.music.bitchord.data.sources.DeviceCodecs
 import com.music.bitchord.data.sources.ModuleSource
 import com.music.bitchord.data.sources.MusicSource
@@ -41,6 +43,35 @@ class SourcesTest {
         /** What the raced fakes below all claim to hold, so the matcher accepts them. */
         const val RACE_TITLE = "Paniyon Sa"
         const val RACE_ARTIST = "Atif Aslam"
+    }
+
+    @Test
+    fun `configured addons remain eligible at every network quality setting`() {
+        assertTrue(AudioQuality.LOSSLESS.permits(SourceKind.ADDON))
+        assertTrue(AudioQuality.HIGH.permits(SourceKind.ADDON))
+        assertTrue(AudioQuality.MEDIUM.permits(SourceKind.ADDON))
+        assertTrue(AudioQuality.LOW.permits(SourceKind.ADDON))
+
+        assertTrue(AudioQuality.MEDIUM.permits(SourceKind.YOUTUBE))
+        assertFalse(AudioQuality.MEDIUM.permits(SourceKind.JIOSAAVN))
+        assertTrue(AudioQuality.HIGH.permits(SourceKind.JIOSAAVN))
+    }
+
+    @Test
+    fun `addons are always asked for their best tier while fallback sources keep the network cap`() {
+        val lowCeiling = StreamRequest.Capped(maxKbps = 64)
+        assertEquals(
+            StreamRequest.Lossless,
+            SourceResolver.requestForSource(SourceKind.ADDON, lowCeiling),
+        )
+        assertEquals(
+            lowCeiling,
+            SourceResolver.requestForSource(SourceKind.YOUTUBE, lowCeiling),
+        )
+        assertEquals(
+            lowCeiling,
+            SourceResolver.requestForSource(SourceKind.JIOSAAVN, lowCeiling),
+        )
     }
 
     // ---- Track identity -----------------------------------------------------
@@ -80,10 +111,10 @@ class SourcesTest {
     @Test
     fun `summary states depth and rate and drops bitrate when lossless`() {
         val hiRes = StreamFormat(codec = "flac", kbps = 4608, sampleRateHz = 192_000, bitDepth = 24)
-        assertEquals("FLAC · 24-bit · 192 kHz", hiRes.summary)
+        assertEquals("FLAC Â· 24-bit Â· 192 kHz", hiRes.summary)
 
         val lossy = StreamFormat(codec = "mp3", kbps = 320, sampleRateHz = 44_100)
-        assertEquals("MP3 · 44.1 kHz · 320 kbps", lossy.summary)
+        assertEquals("MP3 Â· 44.1 kHz Â· 320 kbps", lossy.summary)
 
         assertEquals("Unknown format", StreamFormat().summary)
     }
@@ -100,14 +131,14 @@ class SourcesTest {
     /**
      * ...and premium only where it is allowed to play. E-AC-3 ships with the
      * vendor image, not with Android, and a module that answers every request
-     * with its Atmos master — the Tidal one does — hands a device without that
+     * with its Atmos master â the Tidal one does â hands a device without that
      * decoder a stream that cannot be selected, let alone played. Refusing it
      * at the source is what sends the track to somebody who can serve it;
      * nothing downstream gets a second chance to notice.
      *
      * The listener's own switch enters by the same door, because refusing for
      * taste and refusing for hardware have to leave the resolver in the same
-     * state — anything else is a second code path for the rarer case.
+     * state â anything else is a second code path for the rarer case.
      */
     @Test
     fun `an Atmos rendition is refused when it is not allowed to play`() {
@@ -125,7 +156,7 @@ class SourcesTest {
     /**
      * The badge tiers. "Hi-Quality" exists to separate a module's 320kbps
      * stream from YouTube's 160kbps Opus, which the screen otherwise renders
-     * identically — as nothing at all.
+     * identically â as nothing at all.
      */
     @Test
     fun `names a high-bitrate lossy stream without calling it lossless`() {
@@ -175,7 +206,7 @@ class SourcesTest {
 
     /**
      * Hi-Res is drawn off the measured depth and rate, which for a FLAC in MP4
-     * only exist because the stream's own STREAMINFO was read — the container
+     * only exist because the stream's own STREAMINFO was read â the container
      * states the rate as zero. See `PlaybackService.measure`.
      */
     @Test
@@ -249,19 +280,19 @@ class SourcesTest {
     fun `matches CJK titles across punctuation and spacing differences`() {
         assertTrue(
             matches(
-                song("夜に駆ける", "YOASOBI", duration = "4:20"),
-                title = "夜 に 駆ける！",
+                song("å¤ã«é§ãã", "YOASOBI", duration = "4:20"),
+                title = "å¤ ã« é§ããï¼",
                 artist = "YOASOBI",
                 durationSec = 261,
             ),
         )
-        assertTrue(matches(song("좋은 날", "IU"), "좋은날", "IU"))
+        assertTrue(matches(song("ì¢ì ë ", "IU"), "ì¢ìë ", "IU"))
     }
 
     @Test
     fun `keeps substring matching strict for short Unicode titles`() {
-        assertFalse(matches(song("愛情", "Artist"), "愛", "Artist"))
-        assertFalse(matches(song("봄날", "Artist"), "봄", "Artist"))
+        assertFalse(matches(song("ææ", "Artist"), "æ", "Artist"))
+        assertFalse(matches(song("ë´ë ", "Artist"), "ë´", "Artist"))
     }
 
     /**
@@ -325,7 +356,7 @@ class SourcesTest {
 
     /**
      * The dangerous case: same title, different artist. A cover, a tribute
-     * album, or a completely unrelated song that happens to share a name — all
+     * album, or a completely unrelated song that happens to share a name â all
      * of which a loose matcher would happily play instead.
      */
     @Test
@@ -422,7 +453,7 @@ class SourcesTest {
         assertFalse(matches(song("Creep (Live)", "Radiohead"), "Creep", "Radiohead"))
         assertFalse(matches(song("Faded", "Alan Walker"), "Faded (Slowed + Reverb)", "Alan Walker"))
         // A stem carries the right title and the right artist and is not the
-        // song — this one was one candidate away from playing.
+        // song â this one was one candidate away from playing.
         assertFalse(
             matches(
                 song("Apna Bana Le - Arijit Singh Vocals Only", "Arijit Singh, Sachin-Jigar"),
@@ -666,7 +697,7 @@ class SourcesTest {
         assertTrue(requested.all { !it.allowDownloads })
         assertEquals(4, SourceRegistry.enabledConfigs(requested).size)
         assertEquals(
-            setOf("NullBeat · Max (Auto)", "Nebula (Tidal - Torrents)", "Rukia Addon", "LastWave"),
+            setOf("NullBeat Â· Max (Auto)", "Nebula (Tidal - Torrents)", "Rukia Addon", "LastWave"),
             requested.map { it.label }.toSet(),
         )
     }
@@ -925,7 +956,7 @@ class SourcesTest {
 
     /**
      * A declared tier is a reason to prefer one copy of a recording over
-     * another. It is not a reason to play a different recording — the DJ edit
+     * another. It is not a reason to play a different recording â the DJ edit
      * on a compilation carries the right title and the right artist, and only
      * its runtime gives it away.
      */
@@ -964,12 +995,12 @@ class SourcesTest {
     /**
      * The case this whole path exists for, and the one it shipped wrong.
      *
-     * Tidal publishes the immersive mix as its own row — same recording, same
-     * runtime, different id — and files it under `audioQuality: LOW`. Scored
+     * Tidal publishes the immersive mix as its own row â same recording, same
+     * runtime, different id â and files it under `audioQuality: LOW`. Scored
      * on that label the Atmos mix sorts *below* every stereo row, so
      * [SourceResolver.streamBest] opens the lossless stereo row, gets a
      * perfectly good FLAC and returns; the immersive row is never even asked
-     * for. No `?atmos=` hint can rescue that — the mix is not a rendition of
+     * for. No `?atmos=` hint can rescue that â the mix is not a rendition of
      * the row being asked about.
      */
     @Test
@@ -1017,7 +1048,7 @@ class SourcesTest {
     // ---- Deciding whether an upgrade is worth the seam -----------------------
 
     /**
-     * Lossless is always worth it — it is what was asked for, and the reason
+     * Lossless is always worth it â it is what was asked for, and the reason
      * the second look happens at all.
      */
     @Test
@@ -1080,7 +1111,7 @@ class SourcesTest {
      * ranked above JioSaavn offered 128kbps and JioSaavn held 320kbps, and the
      * walk has to be able to say which of those it would rather have.
      *
-     * Note this is a different question from [SourceResolver.worthSwapping] —
+     * Note this is a different question from [SourceResolver.worthSwapping] â
      * that one asks whether a difference earns a break in the audio, this one
      * only asks which is better.
      */
@@ -1123,7 +1154,7 @@ class SourcesTest {
      *
      * An Atmos stream is E-AC-3 and so answers `isLossless == false`. With the
      * lossless test first, a FLAC won there and the Atmos test below it could
-     * never run — which meant a track offered as both played as the FLAC
+     * never run â which meant a track offered as both played as the FLAC
      * whatever the setting said, and an upgrade pass would cut a FLAC in over
      * an Atmos stream already playing.
      */
@@ -1146,7 +1177,7 @@ class SourcesTest {
     /**
      * And the same answer mid-playback: a FLAC arriving over a playing Atmos
      * stream is a better copy of a mix the listener did not choose, which is a
-     * downgrade dressed as an upgrade — and one that costs a seam in the audio
+     * downgrade dressed as an upgrade â and one that costs a seam in the audio
      * to deliver.
      */
     @Test
@@ -1167,7 +1198,7 @@ class SourcesTest {
     }
 
     /**
-     * Nothing to compare against is beaten by anything — this is what makes the
+     * Nothing to compare against is beaten by anything â this is what makes the
      * first source's answer the floor rather than a special case.
      */
     @Test
@@ -1196,7 +1227,7 @@ class SourcesTest {
     /**
      * An unstated bitrate ranks as nothing rather than as a win. A source that
      * declines to describe its stream should not be able to displace one that
-     * has stated a good rate — see [StreamFormat] on why null means "not
+     * has stated a good rate â see [StreamFormat] on why null means "not
      * stated" and is never inferred.
      */
     @Test
@@ -1256,7 +1287,7 @@ class SourcesTest {
 
     /**
      * Below the top of YouTube's own ladder, a source's copy is trading one
-     * lossy file for another and giving up the more reliable fetch to do it —
+     * lossy file for another and giving up the more reliable fetch to do it â
      * including at 256, where the two are a wash and the tie goes to YouTube.
      */
     @Test
@@ -1268,7 +1299,7 @@ class SourcesTest {
 
     /**
      * A download has to name the file before the first byte lands, so a source
-     * that described its rendition as nothing has said nothing worth keeping —
+     * that described its rendition as nothing has said nothing worth keeping â
      * unlike playback, which can hand the URL to the decoder and find out.
      */
     @Test
@@ -1282,7 +1313,7 @@ class SourcesTest {
     /**
      * Read-ahead resolves the track *after* the one playing, so a source that
      * needs ten seconds to answer is usually still answering when the listener
-     * arrives — and a wasted module resolve costs a QuickJS engine and several
+     * arrives â and a wasted module resolve costs a QuickJS engine and several
      * backend searches, where a wasted JioSaavn one costs a round trip. Only
      * JioSaavn earns the speculative ask.
      */
@@ -1310,7 +1341,7 @@ class SourcesTest {
      * with nothing at all when [format] is null.
      *
      * [asked] records that it was reached, which is how the tests below tell a
-     * source that was beaten from one that was never asked — the distinction
+     * source that was beaten from one that was never asked â the distinction
      * the whole '9:45' investigation turned on.
      */
     private class FakeSource(
@@ -1383,7 +1414,7 @@ class SourcesTest {
      * JioSaavn answered in ~0.4s and the module in ~13.5s. Walked in rank order
      * the module's slowness was JioSaavn's too, so the whole lookup lost the
      * race against YouTube and the listener got 160kbps Opus. Raced, the quick
-     * answer is the one that starts the track — and the slow source is left to
+     * answer is the one that starts the track â and the slow source is left to
      * [SourceResolver.upgradeFor], which judges it against what is playing.
      */
     @Test
@@ -1399,7 +1430,7 @@ class SourcesTest {
         }
         // Nowhere near the slow source's two seconds.
         assertTrue("took ${elapsed}ms, so it waited for the slow source", elapsed < 1_000)
-        // Asked, though — being beaten is not the same as being skipped, and
+        // Asked, though â being beaten is not the same as being skipped, and
         // skipping is the bug this replaced.
         assertTrue(slow.asked)
     }
@@ -1572,7 +1603,7 @@ class SourcesTest {
     fun `asks for the romaji filing of a mixed-script title`() {
         assertEquals(
             listOf("dai zero kan 10-feet", "dai zero kan"),
-            TrackMatcher.queries(TrackMatcher.Target("第ゼロ感 - Dai Zero Kan", "10-FEET")),
+            TrackMatcher.queries(TrackMatcher.Target("ç¬¬ã¼ã­æ - Dai Zero Kan", "10-FEET")),
         )
     }
 
@@ -1580,8 +1611,8 @@ class SourcesTest {
     @Test
     fun `keeps a pure CJK title instead of asking for nothing`() {
         assertEquals(
-            listOf("残響散歌 aimer", "残響散歌"),
-            TrackMatcher.queries(TrackMatcher.Target("残響散歌", "Aimer")),
+            listOf("æ®é¿æ£æ­ aimer", "æ®é¿æ£æ­"),
+            TrackMatcher.queries(TrackMatcher.Target("æ®é¿æ£æ­", "Aimer")),
         )
     }
 
@@ -1590,7 +1621,7 @@ class SourcesTest {
         assertTrue(
             matches(
                 song("Dai Zero Kan", "10-FEET", "4:48"),
-                title = "第ゼロ感 - Dai Zero Kan",
+                title = "ç¬¬ã¼ã­æ - Dai Zero Kan",
                 artist = "10-FEET",
                 durationSec = 288,
             ),
@@ -1601,16 +1632,16 @@ class SourcesTest {
     fun `rejects the cover take of a CJK recording`() {
         assertFalse(
             matches(
-                song("第ゼロ感 (Cover)", "Raise A Suilen", "4:49"),
-                title = "第ゼロ感",
+                song("ç¬¬ã¼ã­æ (Cover)", "Raise A Suilen", "4:49"),
+                title = "ç¬¬ã¼ã­æ",
                 artist = "10-FEET",
                 durationSec = 288,
             ),
         )
         assertFalse(
             matches(
-                song("残響散歌 (カバー)", "Aimer", "4:49"),
-                title = "残響散歌",
+                song("æ®é¿æ£æ­ (ã«ãã¼)", "Aimer", "4:49"),
+                title = "æ®é¿æ£æ­",
                 artist = "Aimer",
                 durationSec = 288,
             ),
@@ -1658,7 +1689,7 @@ class SourcesTest {
         )
     }
 
-    /** Same title, same length — only the album says this one has no vocals. */
+    /** Same title, same length â only the album says this one has no vocals. */
     @Test
     fun `rejects the instrumental twin for a vocal request`() {
         assertFalse(
@@ -1718,18 +1749,18 @@ class SourcesTest {
         // ("with me" is eaten as a feat. marker on both sides alike; the wave
         // dash is a word break, so the query keeps "stay" a separate word.)
         assertEquals(
-            listOf("真夜中のドア stay miki matsubara", "真夜中のドア stay"),
+            listOf("çå¤ä¸­ã®ãã¢ stay miki matsubara", "çå¤ä¸­ã®ãã¢ stay"),
             TrackMatcher.queries(
                 TrackMatcher.Target(
-                    "真夜中のドア〜stay with me - Mayonaka no Door~stay with me",
+                    "çå¤ä¸­ã®ãã¢ãstay with me - Mayonaka no Door~stay with me",
                     "Miki Matsubara",
                 ),
             ),
         )
         assertTrue(
             matches(
-                song("真夜中のドア〜stay with me", "miki matsubara", "5:12", album = "松原みき ベスト・コレクション"),
-                title = "真夜中のドア〜stay with me - Mayonaka no Door~stay with me",
+                song("çå¤ä¸­ã®ãã¢ãstay with me", "miki matsubara", "5:12", album = "æ¾åã¿ã ãã¹ãã»ã³ã¬ã¯ã·ã§ã³"),
+                title = "çå¤ä¸­ã®ãã¢ãstay with me - Mayonaka no Door~stay with me",
                 artist = "Miki Matsubara",
                 durationSec = 312,
             ),
@@ -1741,34 +1772,34 @@ class SourcesTest {
         assertTrue(
             matches(
                 song(
-                    "真夜中のドア〜stay with me (Original club mix)", "miki matsubara", "5:46",
+                    "çå¤ä¸­ã®ãã¢ãstay with me (Original club mix)", "miki matsubara", "5:46",
                     album = "POCKET PARK (Remastered)",
                 ),
-                title = "真夜中のドア〜stay with me (Original club mix)",
+                title = "çå¤ä¸­ã®ãã¢ãstay with me (Original club mix)",
                 artist = "Miki Matsubara",
                 durationSec = 346,
             ),
         )
         assertFalse(
             matches(
-                song("真夜中のドア〜stay with me", "miki matsubara", "5:12"),
-                title = "真夜中のドア〜stay with me (Original club mix)",
+                song("çå¤ä¸­ã®ãã¢ãstay with me", "miki matsubara", "5:12"),
+                title = "çå¤ä¸­ã®ãã¢ãstay with me (Original club mix)",
                 artist = "Miki Matsubara",
                 durationSec = 346,
             ),
         )
     }
 
-    /** One extra query in the other script, without the artist — never a second pair. */
+    /** One extra query in the other script, without the artist â never a second pair. */
     @Test
     fun `asks both scripts for a transliterated pair`() {
         assertEquals(
-            listOf("koikogare mugi", "koikogare", "コイコガレ"),
-            TrackMatcher.queries(TrackMatcher.Target("コイコガレ - koikogare", "MUGI")),
+            listOf("koikogare mugi", "koikogare", "ã³ã¤ã³ã¬ã¬"),
+            TrackMatcher.queries(TrackMatcher.Target("ã³ã¤ã³ã¬ã¬ - koikogare", "MUGI")),
         )
         assertEquals(
-            listOf("コイコガレ mugi", "コイコガレ", "koikogare"),
-            TrackMatcher.queries(TrackMatcher.Target("コイコガレ", "MUGI")),
+            listOf("ã³ã¤ã³ã¬ã¬ mugi", "ã³ã¤ã³ã¬ã¬", "koikogare"),
+            TrackMatcher.queries(TrackMatcher.Target("ã³ã¤ã³ã¬ã¬", "MUGI")),
         )
     }
 
@@ -1776,8 +1807,8 @@ class SourcesTest {
     @Test
     fun `keeps a CJK title whose dash tail is the artist`() {
         assertEquals(
-            listOf("紅蓮華 lisa", "紅蓮華"),
-            TrackMatcher.queries(TrackMatcher.Target("紅蓮華 - LiSA", "LiSA")),
+            listOf("ç´è®è¯ lisa", "ç´è®è¯"),
+            TrackMatcher.queries(TrackMatcher.Target("ç´è®è¯ - LiSA", "LiSA")),
         )
     }
 
@@ -1785,8 +1816,8 @@ class SourcesTest {
     fun `matches the katakana row for a romaji-queried Koi Kogare`() {
         assertTrue(
             matches(
-                song("コイコガレ", "MUGI", "2:39", album = "LAST KISS"),
-                title = "コイコガレ - koikogare",
+                song("ã³ã¤ã³ã¬ã¬", "MUGI", "2:39", album = "LAST KISS"),
+                title = "ã³ã¤ã³ã¬ã¬ - koikogare",
                 artist = "MUGI",
                 durationSec = 159,
             ),
@@ -1795,7 +1826,7 @@ class SourcesTest {
         assertFalse(
             matches(
                 song("Koi Kogare", "milet, MAN WITH A MISSION", "3:36"),
-                title = "コイコガレ - koikogare",
+                title = "ã³ã¤ã³ã¬ã¬ - koikogare",
                 artist = "MUGI",
                 durationSec = 159,
             ),
@@ -1810,7 +1841,7 @@ class SourcesTest {
                     "Kizuna No Kiseki Instrumental", "MAN WITH A MISSION, milet", "3:43",
                     album = "Kizuna No Kiseki / Koi Kogare",
                 ),
-                title = "絆ノ奇跡 -Instrumental- - Kizuna No Kiseki Instrumental",
+                title = "çµãå¥è·¡ -Instrumental- - Kizuna No Kiseki Instrumental",
                 artist = "MAN WITH A MISSION & milet",
                 durationSec = 223,
             ),
@@ -1818,7 +1849,7 @@ class SourcesTest {
         assertFalse(
             matches(
                 song("Kizuna No Kiseki", "MAN WITH A MISSION, milet", "3:43", album = "Kizuna No Kiseki"),
-                title = "絆ノ奇跡 -Instrumental- - Kizuna No Kiseki Instrumental",
+                title = "çµãå¥è·¡ -Instrumental- - Kizuna No Kiseki Instrumental",
                 artist = "MAN WITH A MISSION & milet",
                 durationSec = 223,
             ),
@@ -1847,27 +1878,27 @@ class SourcesTest {
 
     @Test
     fun `transliterates kana to romaji`() {
-        assertEquals("koikogare", TrackMatcher.romajiOf("コイコガレ"))
-        assertEquals("abunaikioku", TrackMatcher.romajiOf("アブナイキオク"))
-        assertEquals("kiseki", TrackMatcher.romajiOf("きせき"))
-        assertEquals("gakkou", TrackMatcher.romajiOf("がっこう"))
-        assertEquals("shimbun", TrackMatcher.romajiOf("しんぶん"))
-        assertEquals("kyou", TrackMatcher.romajiOf("きょう"))
+        assertEquals("koikogare", TrackMatcher.romajiOf("ã³ã¤ã³ã¬ã¬"))
+        assertEquals("abunaikioku", TrackMatcher.romajiOf("ã¢ããã¤ã­ãªã¯"))
+        assertEquals("kiseki", TrackMatcher.romajiOf("ããã"))
+        assertEquals("gakkou", TrackMatcher.romajiOf("ãã£ãã"))
+        assertEquals("shimbun", TrackMatcher.romajiOf("ããã¶ã"))
+        assertEquals("kyou", TrackMatcher.romajiOf("ããã"))
         // Kanji passes through (kana around it still resolves); English loans don't.
-        assertEquals("第zero感", TrackMatcher.romajiOf("第ゼロ感"))
-        assertEquals("doa", TrackMatcher.romajiOf("ドア"))
+        assertEquals("ç¬¬zeroæ", TrackMatcher.romajiOf("ç¬¬ã¼ã­æ"))
+        assertEquals("doa", TrackMatcher.romajiOf("ãã¢"))
         // sh/ch/j carry the glide themselves.
-        assertEquals("sharuru", TrackMatcher.romajiOf("シャルル"))
-        assertEquals("janki", TrackMatcher.romajiOf("ジャンキ"))
-        assertEquals("chotto", TrackMatcher.romajiOf("ちょっと"))
-        assertEquals("jetto", TrackMatcher.romajiOf("ジェット"))
-        // No apostrophe after ん: catalogue romaji doesn't write one.
-        assertEquals("renai", TrackMatcher.romajiOf("レンアイ"))
+        assertEquals("sharuru", TrackMatcher.romajiOf("ã·ã£ã«ã«"))
+        assertEquals("janki", TrackMatcher.romajiOf("ã¸ã£ã³ã­"))
+        assertEquals("chotto", TrackMatcher.romajiOf("ã¡ãã£ã¨"))
+        assertEquals("jetto", TrackMatcher.romajiOf("ã¸ã§ãã"))
+        // No apostrophe after ã: catalogue romaji doesn't write one.
+        assertEquals("renai", TrackMatcher.romajiOf("ã¬ã³ã¢ã¤"))
     }
 
     @Test
     fun `matches the romaji row of a kana title with a syllabic n`() {
-        assertTrue(matches(song("Renai", "A", "3:30"), "レンアイ", "A", 210))
+        assertTrue(matches(song("Renai", "A", "3:30"), "ã¬ã³ã¢ã¤", "A", 210))
     }
 
     /** The album only ever supplies markers the request asked for, never extra ones. */
@@ -1897,8 +1928,8 @@ class SourcesTest {
     /** The katakana middle dot joins a transliterated name; it doesn't separate artists. */
     @Test
     fun `a katakana full name is one artist`() {
-        assertFalse(TrackMatcher.sharesArtist("ジョン・レノン", "ジョン・ウィリアムズ"))
-        assertTrue(TrackMatcher.sharesArtist("ジョン・レノン", "ジョン・レノン、オノ・ヨーコ"))
+        assertFalse(TrackMatcher.sharesArtist("ã¸ã§ã³ã»ã¬ãã³", "ã¸ã§ã³ã»ã¦ã£ãªã¢ã ãº"))
+        assertTrue(TrackMatcher.sharesArtist("ã¸ã§ã³ã»ã¬ãã³", "ã¸ã§ã³ã»ã¬ãã³ããªãã»ã¨ã¼ã³"))
     }
 
     // ---- The mid-track swap guard ------------------------------------------
@@ -1953,7 +1984,7 @@ class SourcesTest {
     }
 
     /**
-     * Two schemes in a URL is not the fault — handing a proxy its target is a
+     * Two schemes in a URL is not the fault â handing a proxy its target is a
      * legitimate thing for a module to do, in the query or in the path, and
      * refusing those would take working catalogues offline.
      */

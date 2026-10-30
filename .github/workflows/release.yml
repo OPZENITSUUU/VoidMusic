@@ -4,12 +4,19 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing Git tag to build and publish"
+        required: true
+        default: "v1.0.9"
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: voidmusic-release-${{ github.ref }}
+  group: voidmusic-release-${{ inputs.release_tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -17,8 +24,10 @@ jobs:
     name: Build and publish signed Android APK
     runs-on: ubuntu-22.04
     steps:
-      - name: Check out source
+      - name: Check out release source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -32,8 +41,6 @@ jobs:
       - name: Configure release signing
         shell: bash
         env:
-          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
-          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -76,19 +83,18 @@ jobs:
           certificate_sha256="$(sha256sum "$temp_dir/certificate.der" | awk '{print toupper($1)}')"
           expected_sha256="4D70AD0DEC72160984BCC04FAD9FC8CC433B275DCC2BBED2918282AEF7E23A6B"
           if [[ "$certificate_sha256" != "$expected_sha256" ]]; then
-            echo "::error::Signing certificate fingerprint mismatch: $certificate_sha256"
+            echo "::error::Signing certificate fingerprint mismatch"
             exit 1
           fi
-          echo "Existing release signing key verified; certificate SHA-256: $certificate_sha256"
+          echo "Existing release signing key verified."
 
-          printf '%s\n' "LASTFM_API_KEY=$LASTFM_API_KEY" "LASTFM_SECRET=$LASTFM_SECRET" > local.properties
           {
             printf 'storeFile=voidmusic-release.jks\n'
             printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
             printf 'keyAlias=%s\n' "$KEY_ALIAS"
             printf 'keyPassword=%s\n' "$KEY_PASSWORD"
           } > keystore.properties
-          chmod 600 voidmusic-release.jks keystore.properties local.properties
+          chmod 600 voidmusic-release.jks keystore.properties
 
       - name: Run Android unit tests
         run: ./gradlew :app:testProdDebugUnitTest
@@ -96,15 +102,20 @@ jobs:
       - name: Build signed production APK
         run: ./gradlew :app:assembleProdRelease
 
-      - name: Verify package, alignment, and signature
+      - name: Verify package, version, alignment, and signature
         shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
           apk=app/build/outputs/apk/prod/release/app-prod-universal-release.apk
           test -s "$apk"
           sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK path is unavailable}}"
           build_tools="$(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$build_tools/aapt" dump badging "$apk" | grep -F "package: name='com.voidmusic.player' versionCode='36' versionName='1.0.4' "
+          expected_version="${RELEASE_TAG#v}"
+          badging="$("$build_tools/aapt" dump badging "$apk")"
+          grep -F "package: name='com.voidmusic.player'" <<< "$badging"
+          grep -F "versionName='$expected_version'" <<< "$badging"
           "$build_tools/zipalign" -c -v 4 "$apk"
           "$build_tools/apksigner" verify --verbose --print-certs "$apk"
           mkdir -p dist
@@ -114,26 +125,25 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Void Music ${{ github.ref_name }}
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          name: Void Music ${{ inputs.release_tag || github.ref_name }}
           draft: false
           make_latest: true
           fail_on_unmatched_files: true
           files: dist/Void.Music.apk
           body: |
-            ## Void Music ${{ github.ref_name }}
+            ## Void Music ${{ inputs.release_tag || github.ref_name }}
 
-            Follow-up Void Music Android release from the OPZENITSUUU/VoidMusic repository.
+            Official Void Music Android release.
 
-            - Adds “Refresh Song” to re-resolve the current track and resume near its previous position.
-            - Improves addon network-consent handling, URL redaction, and LastWave search-result normalization.
+            - Adds refresh-current-song support and improves add-on stream re-resolution.
+            - Fixes add-on playback priority: enabled add-ons remain eligible at every network setting and are always asked for their best/lossless tier. This can use more mobile data than the Low ceiling; YouTube and other non-add-on fallbacks still respect the selected ceiling.
+            - Improves add-on network-consent handling, URL redaction, and LastWave search-result normalization.
             - Enforces provider-aware disk caching and a low-storage guard.
-            - Adds selectable Standard (one upcoming track) and Aggressive (up to five tracks) add-on pre-cache modes, with progress/status and normal-streaming fallback when caching is unavailable.
-            - Shows new releases at app startup with Update Now and Update Later choices; Later keeps the reminder for the next launch.
-            - Keeps the existing music-player feature set and app icon.
+            - Adds Standard (one upcoming track) and Aggressive (up to five tracks) add-on pre-cache modes.
+            - Checks for new releases at app startup and offers Update Now / Update Later.
+            - Keeps the existing application ID and release signing certificate.
 
-            ## Installation and data notice
-
-            This APK uses the same signing certificate as v1.0.1 and can update that release. Android cannot install it as an in-place update over legacy beta7/beta8 builds signed with a different certificate. Back up any important local app data before deciding what to do with an older build. No existing app is uninstalled or overwritten by this workflow.
+            Android can install this as an in-place update only over builds signed with the same certificate. Older beta builds signed with a different certificate cannot be updated in place.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
