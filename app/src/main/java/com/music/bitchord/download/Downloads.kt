@@ -1094,6 +1094,13 @@ object Downloads {
                         }
                         if (!stillReferenced) DownloadStore.delete(context, oldRaw.toUri())
                     }
+                    // Once the old canonical filename is free, move the new
+                    // committed copy into it. If an unrelated alias still owns
+                    // that filename, the unique staged name remains valid.
+                    val canonicalUri = DownloadStore.rename(context, savedUri, originalName)
+                    if (canonicalUri != null && canonicalUri != savedUri) {
+                        remember(song, track, canonicalUri, route.downloadFormat, artworkUri)
+                    }
                 }
                 DownloadSession.done(id)
                 clear(id)
