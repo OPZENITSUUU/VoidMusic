@@ -126,6 +126,8 @@ object Downloads {
 
     /** Waiting, in the order asked for. Guarded by [lock]. */
     private val pending = LinkedHashMap<String, Song>()
+    /** Track ids queued for an explicit, staged higher-quality replacement. Guarded by [lock]. */
+    private val replacementRequests = mutableSetOf<String>()
 
     private val lock = Any()
 
@@ -176,6 +178,21 @@ object Downloads {
      *   only thing that has to say *why* forty tracks are in the queue.
      */
     fun enqueue(context: Context, song: Song, from: String? = null) {
+        enqueueInternal(context, song, from, replaceExisting = false)
+    }
+
+    /** Queue a best-quality re-fetch for an existing download, preserving the old file until commit. */
+    fun enqueueUpgrade(context: Context, song: Song) {
+        if (_saved.value[song.videoId] == null) return
+        enqueueInternal(context, song, from = null, replaceExisting = true)
+    }
+
+    private fun enqueueInternal(
+        context: Context,
+        song: Song,
+        from: String?,
+        replaceExisting: Boolean,
+    ) {
         val id = song.videoId
         if (!AppSettings.downloadsAllowedNow) {
             // Distinct from the duplicate-tap no-op below: nothing is in flight
@@ -192,6 +209,7 @@ object Downloads {
         synchronized(lock) {
             if (id in pending || id in running) return
             pending[id] = song
+            if (replaceExisting) replacementRequests += id
         }
         _active.update { it + (id to DownloadState.Queued) }
         DownloadSession.queued(song, from)
@@ -204,7 +222,10 @@ object Downloads {
             // means the queue has nothing to drain it and would sit there
             // looking accepted forever.
             Log.w(TAG, "could not start the download service: ${it.message}")
-            synchronized(lock) { pending.remove(id) }
+            synchronized(lock) {
+                pending.remove(id)
+                replacementRequests.remove(id)
+            }
             fail(id, "Downloads can't start right now")
         }
     }
@@ -221,6 +242,7 @@ object Downloads {
     fun cancel(videoId: String) {
         val job = synchronized(lock) {
             pending.remove(videoId)
+            replacementRequests.remove(videoId)
             if (videoId !in running) return@synchronized null
             running.remove(videoId)
         }
@@ -829,11 +851,14 @@ object Downloads {
         // one that is working.
         _active.update { it + (id to DownloadState.Running(0f)) }
         DownloadSession.running(id, 0f)
+        val replaceExisting = synchronized(lock) { replacementRequests.remove(id) }
 
         try {
-            val quality = AppSettings.downloadQuality.value
+            // An explicit replacement always asks for the top download tier,
+            // independently of the normal download preference for new files.
+            val quality = if (replaceExisting) DownloadQuality.LOSSLESS else AppSettings.downloadQuality.value
             val excludedSources = linkedSetOf<String>()
-            var plan = prepare(context, song, quality, excludedSources)
+            var plan = prepare(context, song, quality, excludedSources, replaceExisting)
             // The manager is showing the row that was tapped, which for a music
             // video is the wrong title and the wrong cover for the file actually
             // being written. Corrected here rather than left to disagree with
@@ -849,7 +874,7 @@ object Downloads {
                     val failedSource = plan.route?.sourceConfigId ?: throw e
                     if (!excludedSources.add(failedSource)) throw e
                     Log.w(TAG, "source transfer failed for $id; trying next eligible source", e)
-                    plan = prepare(context, song, quality, excludedSources)
+                    plan = prepare(context, song, quality, excludedSources, replaceExisting)
                 }
             }
         } catch (e: CancellationException) {
@@ -887,6 +912,7 @@ object Downloads {
         song: Song,
         quality: DownloadQuality = AppSettings.downloadQuality.value,
         excludedSourceIds: Set<String> = emptySet(),
+        replaceExisting: Boolean = false,
     ): Prepared = withContext(Dispatchers.IO) {
         // Downloads preserve the exact item the listener picked. Catalogue
         // matching is a manual playback action and must not silently change a
@@ -906,7 +932,7 @@ object Downloads {
         // be lossless are worth guessing at: an `.m4a` may be this app's ALAC
         // or its AAC, and adopting the wrong one would quietly answer a request
         // for lossless with a transcode.
-        if (quality.keepsLossless) {
+        if (quality.keepsLossless && !replaceExisting) {
             LOSSLESS_EXTENSIONS.firstNotNullOfOrNull { extension ->
                 DownloadStore.existing(context, DownloadStore.fileNameFor(track, extension))
             }?.let { uri ->
@@ -916,7 +942,7 @@ object Downloads {
 
         val route = routeFor(context, track, quality, excludedSourceIds)
         Log.d(TAG, "downloading ${song.videoId} as .${route.extension} (${route.describe}, ${quality.label})")
-        Prepared(song.videoId, track, route = route, alreadyAt = null)
+        Prepared(song.videoId, track, route = route, alreadyAt = null, replaceExisting = replaceExisting)
     }
 
     /**
@@ -935,6 +961,7 @@ object Downloads {
         val route: Route?,
         /** A file already in Music that is this download, if there is one. */
         val alreadyAt: Uri?,
+        val replaceExisting: Boolean = false,
     )
 
     /**
@@ -957,6 +984,16 @@ object Downloads {
             return
         }
         val route = plan.route ?: error("Nothing to download")
+        // A packaged HLS/DASH directory is keyed by track id rather than file
+        // name, so it cannot be staged side-by-side safely. Let the route fail
+        // over to the next provider rather than risking the existing package.
+        if (plan.replaceExisting && route.offlineHls != null) {
+            throw IllegalStateException("This provider's packaged stream cannot safely replace an existing download")
+        }
+        val previousUris = if (plan.replaceExisting) {
+            setOfNotNull(_saved.value[song.videoId], _saved.value[track.videoId])
+        } else emptySet()
+        val replacedIds = setOf(song.videoId, track.videoId)
 
         var pending: DownloadStore.Pending? = null
         var lyrics: Deferred<LyricsTag.Embeddable?>? = null
@@ -983,9 +1020,11 @@ object Downloads {
                     artwork = async { MediaTagger.artworkFor(context, track) }
                 }
 
-                val name = DownloadStore.fileNameFor(track, route.extension)
+                val originalName = DownloadStore.fileNameFor(track, route.extension)
+                val name = if (plan.replaceExisting) upgradeFileName(originalName) else originalName
                 val alreadyThere = DownloadStore.existing(context, name)
                 if (alreadyThere != null) {
+                    if (plan.replaceExisting) error("Could not reserve a fresh replacement file")
                     Log.d(TAG, "$name is already in Music; adopting it")
                     remember(song, track, alreadyThere)
                     DownloadSession.done(id)
@@ -1046,9 +1085,19 @@ object Downloads {
                 val savedUri = destination.commit()
                 pending = null
                 remember(song, track, savedUri, route.downloadFormat, artworkUri)
+                if (plan.replaceExisting) {
+                    // The new URI is now authoritative. Remove old files only
+                    // when no other saved-track alias still points at them.
+                    previousUris.forEach { oldRaw ->
+                        val stillReferenced = _saved.value.any { (savedId, savedRaw) ->
+                            savedId !in replacedIds && savedRaw == oldRaw
+                        }
+                        if (!stillReferenced) DownloadStore.delete(context, oldRaw.toUri())
+                    }
+                }
                 DownloadSession.done(id)
                 clear(id)
-                Log.d(TAG, "saved $name")
+                Log.d(TAG, if (plan.replaceExisting) "replaced $name" else "saved $name")
             }
         } catch (e: Throwable) {
             pending?.abort()
@@ -1267,6 +1316,44 @@ object Downloads {
     /** Back to "not downloaded" — used for success, where [saved] takes over, and for cancellation. */
     private fun clear(videoId: String) {
         _active.update { it - videoId }
+    }
+
+    /**
+     * Detect whether a saved copy is worth offering a fresh best-quality fetch.
+     * Known lossless/Dolby files are left alone; old or unknown lossy copies are
+     * offered the explicit upgrade action in the song menu.
+     */
+    suspend fun needsQualityUpgrade(context: Context, videoId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val rawUri = _saved.value[videoId] ?: return@withContext false
+            val uri = rawUri.toUri()
+            if (!DownloadStore.exists(context, uri)) return@withContext false
+            val label = _savedMetadata.value[videoId]?.downloadFormat.orEmpty().uppercase(Locale.ROOT)
+            if (label.contains("FLAC") || label.contains("WAV") || label.contains("ALAC") || label.contains("DOLBY")) {
+                return@withContext false
+            }
+            val labelledKbps = Regex("(\\d{2,4})\\s*KBPS").find(label)
+                ?.groupValues?.getOrNull(1)?.toIntOrNull()
+            val bitrate = labelledKbps ?: runCatching {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, uri)
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
+                        ?.toLongOrNull()?.div(1_000L)?.toInt()
+                } finally {
+                    retriever.release()
+                }
+            }.getOrNull()
+            // Unknown telemetry is not proof of good quality; allow the user to
+            // ask the providers instead of silently assuming the file is ideal.
+            bitrate == null || bitrate < 256
+        }
+
+    private fun upgradeFileName(original: String): String {
+        val extension = original.substringAfterLast('.', "")
+        val stem = if (extension.isEmpty()) original else original.substringBeforeLast('.')
+        val unique = System.currentTimeMillis()
+        return if (extension.isEmpty()) "$stem (upgrade-$unique)" else "$stem (upgrade-$unique).$extension"
     }
 
     private fun fail(videoId: String, reason: String) {
