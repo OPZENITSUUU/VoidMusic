@@ -1328,8 +1328,8 @@ object Downloads {
 
     /**
      * Detect whether a saved copy is worth offering a fresh best-quality fetch.
-     * Known lossless/Dolby files are left alone; old or unknown lossy copies are
-     * offered the explicit upgrade action in the song menu.
+     * Known lossless/Dolby files and files without measurable low-bitrate evidence
+     * are left alone; measured lower-bitrate copies get the explicit upgrade action.
      */
     suspend fun needsQualityUpgrade(context: Context, videoId: String): Boolean =
         withContext(Dispatchers.IO) {
