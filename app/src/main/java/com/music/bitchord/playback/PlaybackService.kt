@@ -725,6 +725,8 @@ class PlaybackService : MediaLibraryService() {
     private var boundedEditState = BoundedQueueEditState()
 
     private val localBitrateCache = ConcurrentHashMap<String, Int>()
+    /** Whole-file average from bytes/duration; deliberately labelled DERIVED, not source-reported. */
+    private val localAverageBitrateCache = ConcurrentHashMap<String, Int>()
 
     /**
      * The stream resolver the player's own data source runs, kept so a Cast
@@ -1292,6 +1294,7 @@ class PlaybackService : MediaLibraryService() {
         // state lives.
         NerdStats.forgetLastSession()
         localBitrateCache.clear()
+        localAverageBitrateCache.clear()
         QualityUpgrade.forgetLastSession()
 
         setMediaNotificationProvider(
@@ -4590,9 +4593,9 @@ class PlaybackService : MediaLibraryService() {
         // Media3 often has no container bitrate for Opus/WebM. Downloads have
         // their own measured file bitrate cache, populated from the file rather
         // than from an add-on's catalogue claim.
-        localBitrateCache[mediaId]?.takeIf { it > 0 }?.let {
-            return StreamFormat(kbps = it)
-        }
+        (localBitrateCache[mediaId] ?: localAverageBitrateCache[mediaId])
+            ?.takeIf { it > 0 }
+            ?.let { return StreamFormat(kbps = it) }
         val seconds = durationSec?.takeIf { it > 0 } ?: return null
         val cachedBytes = AudioCache.contentLengthOf(uri).takeIf { it > 0 }
         val localBytes = localUri?.let { source ->
@@ -5706,11 +5709,11 @@ class PlaybackService : MediaLibraryService() {
 
     private fun resolveLocalBitrate(mediaId: String, mediaItem: MediaItem?) {
         if (!isLocalPlayback(mediaId, mediaItem)) return
-        if (localBitrateCache.containsKey(mediaId)) return
+        if (localBitrateCache.containsKey(mediaId) || localAverageBitrateCache.containsKey(mediaId)) return
 
         val uri = resolveLocalUri(mediaId, mediaItem) ?: return
         scope.launch(Dispatchers.IO) {
-            val kbps = runCatching {
+            val measurement = runCatching {
                 val retriever = MediaMetadataRetriever()
                 var bps: Long? = null
                 var durMs: Long? = null
@@ -5723,7 +5726,7 @@ class PlaybackService : MediaLibraryService() {
                 }
 
                 if (bps != null && bps > 0) {
-                    ((bps + 500L) / 1000L).toInt()
+                    (((bps + 500L) / 1000L).toInt() to TelemetryProvenance.SOURCE_REPORTED)
                 } else if (durMs != null && durMs > 0) {
                     val sizeBytes = when (uri.scheme) {
                         "file" -> uri.path?.let { java.io.File(it).length() }
@@ -5731,13 +5734,19 @@ class PlaybackService : MediaLibraryService() {
                         else -> null
                     }
                     if (sizeBytes != null && sizeBytes > 0) {
-                        ((sizeBytes * 8000L) / durMs / 1000L).toInt().takeIf { it > 0 }
+                        (((sizeBytes * 8000L) / durMs / 1000L).toInt().takeIf { it > 0 })
+                            ?.let { it to TelemetryProvenance.DERIVED }
                     } else null
                 } else null
             }.getOrNull()
 
+            val kbps = measurement?.first
             if (kbps != null && kbps > 0) {
-                localBitrateCache[mediaId] = kbps
+                if (measurement.second == TelemetryProvenance.SOURCE_REPORTED) {
+                    localBitrateCache[mediaId] = kbps
+                } else {
+                    localAverageBitrateCache[mediaId] = kbps
+                }
                 withContext(Dispatchers.Main) {
                     if (player?.currentMediaItem?.mediaId == mediaId) {
                         publishNerdStats()
@@ -5770,6 +5779,8 @@ class PlaybackService : MediaLibraryService() {
                 Pair((format.bitrate + 500) / 1000, TelemetryProvenance.SOURCE_REPORTED)
             mediaId != null && localBitrateCache.containsKey(mediaId) ->
                 Pair(localBitrateCache[mediaId], TelemetryProvenance.SOURCE_REPORTED)
+            mediaId != null && localAverageBitrateCache.containsKey(mediaId) ->
+                Pair(localAverageBitrateCache[mediaId], TelemetryProvenance.DERIVED)
             NerdStats.declaredFormat(mediaId)?.kbps != null ->
                 Pair(NerdStats.declaredFormat(mediaId)?.kbps, TelemetryProvenance.SOURCE_REPORTED)
             NerdStats.pickedBitrateKbps(mediaId) != null ->
