@@ -110,6 +110,15 @@ enum class ThemeMode(val label: String) {
     SYSTEM("System"), LIGHT("Light"), DARK("Dark")
 }
 
+/** Launcher icon aliases available in the phone app. */
+enum class LauncherIcon {
+    DEFAULT,
+    PURPLE,
+    GALAXY,
+    NEON,
+    SILVER,
+}
+
 /**
  * Which of the equaliser's two tabs is driving the sound.
  *
@@ -353,6 +362,7 @@ object AppSettings {
 
     val playbackSpeed = MutableStateFlow(1.0f)
     val themeMode = MutableStateFlow(ThemeMode.DARK)
+    val launcherIcon = MutableStateFlow(LauncherIcon.DEFAULT)
 
     /** Keep playing similar music once the queue runs out. */
     val autoplay = MutableStateFlow(true)
@@ -866,6 +876,9 @@ object AppSettings {
         themeMode.value = runCatching {
             ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: "DARK")
         }.getOrDefault(ThemeMode.DARK)
+        launcherIcon.value = runCatching {
+            LauncherIcon.valueOf(prefs.getString(KEY_LAUNCHER_ICON, null) ?: LauncherIcon.DEFAULT.name)
+        }.getOrDefault(LauncherIcon.DEFAULT)
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
@@ -1238,6 +1251,11 @@ object AppSettings {
     fun setThemeMode(value: ThemeMode) {
         themeMode.value = value
         prefs.edit().putString(KEY_THEME, value.name).apply()
+    }
+
+    fun setLauncherIcon(value: LauncherIcon) {
+        launcherIcon.value = value
+        prefs.edit().putString(KEY_LAUNCHER_ICON, value.name).apply()
     }
 
     fun setReduceAnimation(value: Boolean) {
@@ -1991,6 +2009,7 @@ object AppSettings {
         "downloaded_collections",
         KEY_LOCAL_MUSIC_FOLDER_URI,
         KEY_LAST_VERSION_CODE,
+        KEY_LAUNCHER_ICON,
     )
 
     const val DEFAULT_CACHE_LIMIT_BYTES = 512L * 1024 * 1024
@@ -2042,6 +2061,7 @@ object AppSettings {
     private const val KEY_EQ_BANDS = "equalizer_bands"
     private const val KEY_SPEED = "playback_speed"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_LAUNCHER_ICON = "launcher_icon"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"

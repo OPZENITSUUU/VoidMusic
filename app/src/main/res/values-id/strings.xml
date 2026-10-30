@@ -1348,4 +1348,15 @@
     <string name="refresh_song_complete">Lagu diperbarui.</string>
     <string name="refresh_song_not_supported">Pembaruan hanya tersedia untuk lagu streaming.</string>
     <string name="refresh_song_failed">Lagu ini tidak dapat diperbarui. Coba lagi.</string>
+    <string name="app_icon">Ikon aplikasi</string>
+    <string name="app_icon_subtitle">Pilih tampilan Void Music di layar utama</string>
+    <string name="app_icon_picker_title">Pilih ikon aplikasi</string>
+    <string name="app_icon_default">Default</string>
+    <string name="app_icon_purple">Ungu</string>
+    <string name="app_icon_galaxy">Galaksi</string>
+    <string name="app_icon_neon">Hijau neon</string>
+    <string name="app_icon_silver">Krom perak</string>
+    <string name="app_icon_apply">Terapkan</string>
+    <string name="app_icon_changed">Ikon aplikasi diubah. Peluncur mungkin perlu waktu untuk memperbarui.</string>
+    <string name="app_icon_failed">Ikon aplikasi tidak dapat diubah: %1$s</string>
 </resources>

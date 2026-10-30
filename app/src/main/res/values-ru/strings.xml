@@ -1403,4 +1403,15 @@
     <string name="refresh_song_complete">Песня обновлена.</string>
     <string name="refresh_song_not_supported">Обновление доступно только для потоковых песен.</string>
     <string name="refresh_song_failed">Не удалось обновить эту песню. Повторите попытку.</string>
+    <string name="app_icon">Значок приложения</string>
+    <string name="app_icon_subtitle">Выберите, как Void Music будет выглядеть на главном экране</string>
+    <string name="app_icon_picker_title">Выбрать значок приложения</string>
+    <string name="app_icon_default">По умолчанию</string>
+    <string name="app_icon_purple">Фиолетовый</string>
+    <string name="app_icon_galaxy">Галактика</string>
+    <string name="app_icon_neon">Неоново-зелёный</string>
+    <string name="app_icon_silver">Серебристый хром</string>
+    <string name="app_icon_apply">Применить</string>
+    <string name="app_icon_changed">Значок изменён. Обновление лаунчера может занять некоторое время.</string>
+    <string name="app_icon_failed">Не удалось изменить значок: %1$s</string>
 </resources>

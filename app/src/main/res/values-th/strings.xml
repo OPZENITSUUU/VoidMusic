@@ -1354,4 +1354,15 @@
     <string name="refresh_song_complete">รีเฟรชเพลงแล้ว</string>
     <string name="refresh_song_not_supported">รีเฟรชได้เฉพาะเพลงที่สตรีมเท่านั้น</string>
     <string name="refresh_song_failed">รีเฟรชเพลงนี้ไม่สำเร็จ โปรดลองอีกครั้ง</string>
+    <string name="app_icon">ไอคอนแอป</string>
+    <string name="app_icon_subtitle">เลือกรูปลักษณ์ของ Void Music บนหน้าจอหลัก</string>
+    <string name="app_icon_picker_title">เลือกไอคอนแอป</string>
+    <string name="app_icon_default">ค่าเริ่มต้น</string>
+    <string name="app_icon_purple">สีม่วง</string>
+    <string name="app_icon_galaxy">กาแล็กซี</string>
+    <string name="app_icon_neon">เขียวนีออน</string>
+    <string name="app_icon_silver">โครเมียมสีเงิน</string>
+    <string name="app_icon_apply">ใช้</string>
+    <string name="app_icon_changed">เปลี่ยนไอคอนแอปแล้ว Launcher อาจใช้เวลาสักครู่ในการรีเฟรช</string>
+    <string name="app_icon_failed">เปลี่ยนไอคอนแอปไม่ได้: %1$s</string>
 </resources>

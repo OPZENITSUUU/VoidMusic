@@ -327,6 +327,17 @@
     <string name="show_nerd_stats">Show stats for nerds</string>
     <string name="show_nerd_stats_subtitle">Codec, bitrate and sample rate on the player</string>
     <string name="theme">Theme</string>
+    <string name="app_icon">App icon</string>
+    <string name="app_icon_subtitle">Choose how Void Music appears on your home screen</string>
+    <string name="app_icon_picker_title">Choose app icon</string>
+    <string name="app_icon_default">Default</string>
+    <string name="app_icon_purple">Purple</string>
+    <string name="app_icon_galaxy">Galaxy</string>
+    <string name="app_icon_neon">Neon green</string>
+    <string name="app_icon_silver">Silver chrome</string>
+    <string name="app_icon_apply">Apply</string>
+    <string name="app_icon_changed">App icon changed. Your launcher may take a moment to refresh.</string>
+    <string name="app_icon_failed">Could not change app icon: %1$s</string>
     <string name="reduce_animation">Reduce animation</string>
     <string name="reduce_animation_subtitle">Freezes the main player\'s gradient instead of drifting</string>
     <string name="reduce_dynamic_blur">Reduce dynamic blur</string>

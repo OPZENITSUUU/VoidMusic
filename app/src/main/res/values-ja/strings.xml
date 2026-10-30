@@ -1349,4 +1349,15 @@
     <string name="refresh_song_complete">曲を更新しました。</string>
     <string name="refresh_song_not_supported">更新はストリーミング曲でのみ利用できます。</string>
     <string name="refresh_song_failed">この曲を更新できませんでした。もう一度お試しください。</string>
+    <string name="app_icon">アプリアイコン</string>
+    <string name="app_icon_subtitle">ホーム画面でのVoid Musicの表示を選択</string>
+    <string name="app_icon_picker_title">アプリアイコンを選択</string>
+    <string name="app_icon_default">デフォルト</string>
+    <string name="app_icon_purple">パープル</string>
+    <string name="app_icon_galaxy">ギャラクシー</string>
+    <string name="app_icon_neon">ネオングリーン</string>
+    <string name="app_icon_silver">シルバークローム</string>
+    <string name="app_icon_apply">適用</string>
+    <string name="app_icon_changed">アプリアイコンを変更しました。ランチャーの更新には少し時間がかかる場合があります。</string>
+    <string name="app_icon_failed">アプリアイコンを変更できませんでした：%1$s</string>
 </resources>

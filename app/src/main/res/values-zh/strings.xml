@@ -1348,4 +1348,15 @@
     <string name="refresh_song_complete">歌曲已刷新。</string>
     <string name="refresh_song_not_supported">刷新功能仅适用于流媒体歌曲。</string>
     <string name="refresh_song_failed">无法刷新此歌曲。请重试。</string>
+    <string name="app_icon">应用图标</string>
+    <string name="app_icon_subtitle">选择 Void Music 在主屏幕上的显示方式</string>
+    <string name="app_icon_picker_title">选择应用图标</string>
+    <string name="app_icon_default">默认</string>
+    <string name="app_icon_purple">紫色</string>
+    <string name="app_icon_galaxy">星系</string>
+    <string name="app_icon_neon">霓虹绿</string>
+    <string name="app_icon_silver">银色镀铬</string>
+    <string name="app_icon_apply">应用</string>
+    <string name="app_icon_changed">应用图标已更改。启动器可能需要一些时间才能刷新。</string>
+    <string name="app_icon_failed">无法更改应用图标：%1$s</string>
 </resources>

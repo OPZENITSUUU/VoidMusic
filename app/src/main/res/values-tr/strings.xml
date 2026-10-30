@@ -1328,4 +1328,15 @@
     <string name="refresh_song_complete">Şarkı yenilendi.</string>
     <string name="refresh_song_not_supported">Yenileme yalnızca akışla dinlenen şarkılarda kullanılabilir.</string>
     <string name="refresh_song_failed">Bu şarkı yenilenemedi. Tekrar deneyin.</string>
+    <string name="app_icon">Uygulama simgesi</string>
+    <string name="app_icon_subtitle">Void Music’in ana ekranda nasıl görüneceğini seçin</string>
+    <string name="app_icon_picker_title">Uygulama simgesi seç</string>
+    <string name="app_icon_default">Varsayılan</string>
+    <string name="app_icon_purple">Mor</string>
+    <string name="app_icon_galaxy">Galaksi</string>
+    <string name="app_icon_neon">Neon yeşil</string>
+    <string name="app_icon_silver">Gümüş krom</string>
+    <string name="app_icon_apply">Uygula</string>
+    <string name="app_icon_changed">Uygulama simgesi değiştirildi. Başlatıcının yenilenmesi biraz sürebilir.</string>
+    <string name="app_icon_failed">Uygulama simgesi değiştirilemedi: %1$s</string>
 </resources>

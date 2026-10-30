@@ -1343,4 +1343,15 @@
     <string name="refresh_song_complete">Canción actualizada.</string>
     <string name="refresh_song_not_supported">La actualización solo está disponible para canciones en streaming.</string>
     <string name="refresh_song_failed">No se pudo actualizar esta canción. Inténtalo de nuevo.</string>
+    <string name="app_icon">Icono de la aplicación</string>
+    <string name="app_icon_subtitle">Elige cómo aparece Void Music en tu pantalla de inicio</string>
+    <string name="app_icon_picker_title">Elegir icono de la aplicación</string>
+    <string name="app_icon_default">Predeterminado</string>
+    <string name="app_icon_purple">Morado</string>
+    <string name="app_icon_galaxy">Galaxia</string>
+    <string name="app_icon_neon">Verde neón</string>
+    <string name="app_icon_silver">Cromo plateado</string>
+    <string name="app_icon_apply">Aplicar</string>
+    <string name="app_icon_changed">Icono cambiado. Es posible que el launcher tarde un momento en actualizarse.</string>
+    <string name="app_icon_failed">No se pudo cambiar el icono: %1$s</string>
 </resources>

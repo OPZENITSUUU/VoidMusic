@@ -1348,4 +1348,15 @@
     <string name="refresh_song_complete">歌曲已重新整理。</string>
     <string name="refresh_song_not_supported">重新整理僅適用於串流歌曲。</string>
     <string name="refresh_song_failed">無法重新整理這首歌曲，請再試一次。</string>
+    <string name="app_icon">應用程式圖示</string>
+    <string name="app_icon_subtitle">選擇 Void Music 在主畫面的顯示方式</string>
+    <string name="app_icon_picker_title">選擇應用程式圖示</string>
+    <string name="app_icon_default">預設</string>
+    <string name="app_icon_purple">紫色</string>
+    <string name="app_icon_galaxy">星系</string>
+    <string name="app_icon_neon">霓虹綠</string>
+    <string name="app_icon_silver">銀色鍍鉻</string>
+    <string name="app_icon_apply">套用</string>
+    <string name="app_icon_changed">應用程式圖示已變更。啟動器可能需要一些時間才會更新。</string>
+    <string name="app_icon_failed">無法變更應用程式圖示：%1$s</string>
 </resources>

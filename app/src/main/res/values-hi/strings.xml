@@ -1371,4 +1371,15 @@
     <string name="refresh_song_complete">गाना रीफ़्रेश हो गया।</string>
     <string name="refresh_song_not_supported">रीफ़्रेश केवल स्ट्रीमिंग गानों के लिए उपलब्ध है।</string>
     <string name="refresh_song_failed">गाना रीफ़्रेश नहीं हो सका। फिर कोशिश करें।</string>
+    <string name="app_icon">ऐप आइकन</string>
+    <string name="app_icon_subtitle">चुनें कि होम स्क्रीन पर Void Music कैसी दिखे</string>
+    <string name="app_icon_picker_title">ऐप आइकन चुनें</string>
+    <string name="app_icon_default">डिफ़ॉल्ट</string>
+    <string name="app_icon_purple">बैंगनी</string>
+    <string name="app_icon_galaxy">आकाशगंगा</string>
+    <string name="app_icon_neon">नियॉन हरा</string>
+    <string name="app_icon_silver">सिल्वर क्रोम</string>
+    <string name="app_icon_apply">लागू करें</string>
+    <string name="app_icon_changed">ऐप आइकन बदल गया। लॉन्चर को रीफ़्रेश होने में थोड़ा समय लग सकता है।</string>
+    <string name="app_icon_failed">ऐप आइकन नहीं बदल सका: %1$s</string>
 </resources>

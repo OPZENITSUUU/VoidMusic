@@ -151,6 +151,8 @@ import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.AddonCacheMode
+import com.music.bitchord.data.settings.LauncherIcon
+import com.music.bitchord.data.settings.LauncherIconManager
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.data.settings.AutomixPerformanceMode
@@ -231,6 +233,7 @@ fun SettingsScreen(
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
+    val selectedLauncherIcon by AppSettings.launcherIcon.collectAsStateWithLifecycle()
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
     val outputPcmMode by AppSettings.outputPcmMode.collectAsStateWithLifecycle()
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
@@ -298,6 +301,8 @@ fun SettingsScreen(
     var picking by remember { mutableStateOf<QualityTarget?>(null) }
     var pickingDownloadQuality by remember { mutableStateOf(false) }
     var pickingAutomixPerformance by remember { mutableStateOf(false) }
+    var showLauncherIconPicker by remember { mutableStateOf(false) }
+    var pendingLauncherIcon by remember { mutableStateOf(selectedLauncherIcon) }
     // What the last export or import did, shown on the row that did it rather
     // than as a toast: a backup is the one action here whose outcome nobody can
     // check by looking at the app afterwards. Held per direction, or an import's
@@ -841,6 +846,33 @@ fun SettingsScreen(
         }
 
         SearchableSettingsGroup(search, header = stringResource(R.string.appearance)) {
+            val appIconTitle = stringResource(R.string.app_icon)
+            val selectedIconName = stringResource(selectedLauncherIcon.labelResource())
+            row(appIconTitle, "launcher", "logo", "custom icon") {
+                SettingsRow(
+                    icon = Icons.Rounded.Apps,
+                    title = appIconTitle,
+                    subtitle = stringResource(R.string.app_icon_subtitle),
+                    onClick = {
+                        pendingLauncherIcon = selectedLauncherIcon
+                        showLauncherIconPicker = true
+                    },
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painter = painterResource(selectedLauncherIcon.previewResource()),
+                                contentDescription = selectedIconName,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp)),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Chevron()
+                        }
+                    },
+                )
+            }
             val themeTitle = stringResource(R.string.theme)
             row(themeTitle, "dark mode", "light mode") {
                 SettingsRow(icon = Icons.Rounded.Brightness4, title = themeTitle)
@@ -1796,6 +1828,75 @@ fun SettingsScreen(
                 },
             )
         }
+    }
+
+    if (showLauncherIconPicker) {
+        AlertDialog(
+            onDismissRequest = { showLauncherIconPicker = false },
+            title = { Text(stringResource(R.string.app_icon_picker_title)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    LauncherIcon.entries.forEach { option ->
+                        val optionName = stringResource(option.labelResource())
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { pendingLauncherIcon = option }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Image(
+                                painter = painterResource(option.previewResource()),
+                                contentDescription = optionName,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(optionName, modifier = Modifier.weight(1f))
+                            RadioButton(
+                                selected = pendingLauncherIcon == option,
+                                onClick = { pendingLauncherIcon = option },
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { LauncherIconManager.apply(context, pendingLauncherIcon) }
+                        .onSuccess {
+                            Toast.makeText(
+                                context,
+                                R.string.app_icon_changed,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                        .onFailure { error ->
+                            Toast.makeText(
+                                context,
+                                context.getString(
+                                    R.string.app_icon_failed,
+                                    error.localizedMessage.orEmpty().ifBlank {
+                                        context.getString(R.string.app_icon_picker_title)
+                                    },
+                                ),
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    showLauncherIconPicker = false
+                }) {
+                    Text(stringResource(R.string.app_icon_apply))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLauncherIconPicker = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 
     // Everything in the Cached songs folder goes with it, so say so first.
@@ -2992,4 +3093,21 @@ internal fun SegmentedControl(
             }
         }
     }
+}
+
+
+private fun LauncherIcon.labelResource(): Int = when (this) {
+    LauncherIcon.DEFAULT -> R.string.app_icon_default
+    LauncherIcon.PURPLE -> R.string.app_icon_purple
+    LauncherIcon.GALAXY -> R.string.app_icon_galaxy
+    LauncherIcon.NEON -> R.string.app_icon_neon
+    LauncherIcon.SILVER -> R.string.app_icon_silver
+}
+
+private fun LauncherIcon.previewResource(): Int = when (this) {
+    LauncherIcon.DEFAULT -> R.drawable.ic_launcher_default_preview
+    LauncherIcon.PURPLE -> R.drawable.ic_launcher_purple_preview
+    LauncherIcon.GALAXY -> R.drawable.ic_launcher_galaxy_preview
+    LauncherIcon.NEON -> R.drawable.ic_launcher_neon_preview
+    LauncherIcon.SILVER -> R.drawable.ic_launcher_silver_preview
 }

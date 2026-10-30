@@ -1376,4 +1376,15 @@
     <string name="refresh_song_complete">השיר רוענן.</string>
     <string name="refresh_song_not_supported">הרענון זמין רק לשירים בסטרימינג.</string>
     <string name="refresh_song_failed">לא ניתן לרענן את השיר. נסה שוב.</string>
+    <string name="app_icon">סמל האפליקציה</string>
+    <string name="app_icon_subtitle">בחרו איך Void Music תופיע במסך הבית</string>
+    <string name="app_icon_picker_title">בחירת סמל אפליקציה</string>
+    <string name="app_icon_default">ברירת מחדל</string>
+    <string name="app_icon_purple">סגול</string>
+    <string name="app_icon_galaxy">גלקסיה</string>
+    <string name="app_icon_neon">ירוק ניאון</string>
+    <string name="app_icon_silver">כרום כסוף</string>
+    <string name="app_icon_apply">החלה</string>
+    <string name="app_icon_changed">סמל האפליקציה שונה. ייתכן שיידרש רגע עד שהמשגר יתרענן.</string>
+    <string name="app_icon_failed">לא ניתן לשנות את סמל האפליקציה: %1$s</string>
 </resources>

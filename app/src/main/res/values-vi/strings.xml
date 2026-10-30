@@ -1288,4 +1288,15 @@
     <string name="refresh_song_complete">Đã làm mới bài hát.</string>
     <string name="refresh_song_not_supported">Chỉ có thể làm mới bài hát đang phát trực tuyến.</string>
     <string name="refresh_song_failed">Không thể làm mới bài hát này. Hãy thử lại.</string>
+    <string name="app_icon">Biểu tượng ứng dụng</string>
+    <string name="app_icon_subtitle">Chọn cách Void Music hiển thị trên màn hình chính</string>
+    <string name="app_icon_picker_title">Chọn biểu tượng ứng dụng</string>
+    <string name="app_icon_default">Mặc định</string>
+    <string name="app_icon_purple">Tím</string>
+    <string name="app_icon_galaxy">Thiên hà</string>
+    <string name="app_icon_neon">Xanh neon</string>
+    <string name="app_icon_silver">Crom bạc</string>
+    <string name="app_icon_apply">Áp dụng</string>
+    <string name="app_icon_changed">Đã đổi biểu tượng. Trình khởi chạy có thể cần một lúc để cập nhật.</string>
+    <string name="app_icon_failed">Không thể đổi biểu tượng ứng dụng: %1$s</string>
 </resources>
