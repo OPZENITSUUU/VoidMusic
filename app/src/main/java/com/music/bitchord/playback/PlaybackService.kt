@@ -3910,8 +3910,27 @@ class PlaybackService : MediaLibraryService() {
         val videoId = playbackUri.getQueryParameter("v")
         val substituted = videoId?.let(StreamChoice::isSubstitute) == true
         if (!PlaybackFallback.isAlternative(playbackUri.toString(), substituted)) return false
-        val fallback = item.toYouTubeFallbackMediaItem() ?: return false
         val mediaId = item.mediaId
+        // A downloaded track already has a verified local rendition. If an
+        // online upgrade fails, prefer returning to that exact file rather than
+        // jumping to YouTube and making the saved copy unusable offline.
+        val savedUri = item.mediaMetadata.extras
+            ?.getString(EXTRA_LOCAL_URI)
+            ?.let(Uri::parse)
+            ?.takeIf { com.music.bitchord.download.DownloadStore.exists(applicationContext, it) }
+        val fallback = savedUri?.let { local ->
+            val cleanMetadata = item.mediaMetadata.buildUpon()
+                .setExtras(Bundle(item.mediaMetadata.extras ?: Bundle()).apply {
+                    remove(EXTRA_QUALITY_UPGRADED)
+                    remove(EXTRA_QUALITY_LOOKUP_URI)
+                })
+                .build()
+            item.buildUpon()
+                .setUri(local)
+                .setMimeType(null)
+                .setMediaMetadata(cleanMetadata)
+                .build()
+        } ?: item.toYouTubeFallbackMediaItem() ?: return false
 
         QualityUpgrade.forget(mediaId)
         QualityUpgrade.refuseUpgrades(mediaId)
