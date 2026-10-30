@@ -3688,7 +3688,12 @@ class PlaybackService : MediaLibraryService() {
     private fun recoverFrom(error: PlaybackException, player: ExoPlayer) {
         val item = player.currentMediaItem ?: return
         val mediaId = item.mediaId
-        val uri = item.localConfiguration?.uri
+        val localUri = item.localConfiguration?.uri
+        // Downloaded songs deliberately open from file/content first. Their
+        // canonical catalogue identity is carried separately in metadata so
+        // the exact same quality-upgrade path can inspect online sources.
+        val uri = item.mediaMetadata.extras?.getString(EXTRA_QUALITY_LOOKUP_URI)
+            ?.let(Uri::parse) ?: localUri
         if (refreshSongJob?.isActive == true &&
             uri?.getQueryParameter(AudioCache.REFRESH_PARAM) != null
         ) {
@@ -4316,7 +4321,7 @@ class PlaybackService : MediaLibraryService() {
             // the cached-track path, was refused by it for being pending, and
             // lost its upgrade until the next progress sample came round.
             if (!QualityUpgrade.isPending(mediaId) &&
-                (uri == null || !adoptCachedTrack(mediaId, uri, playingSeconds))
+                (uri == null || !adoptCachedTrack(mediaId, uri, playingSeconds, localUri))
             ) {
                 return@launch
             }
@@ -4506,16 +4511,18 @@ class PlaybackService : MediaLibraryService() {
      *   caller — needed here to turn the size of the cache entry into a
      *   bitrate. See [cachedFloor].
      */
-    private suspend fun adoptCachedTrack(mediaId: String, uri: Uri, durationSec: Int?): Boolean {
+    private suspend fun adoptCachedTrack(
+        mediaId: String,
+        uri: Uri,
+        durationSec: Int?,
+        localUri: Uri?,
+    ): Boolean {
         val format = withContext(Dispatchers.Main) {
             player
                 ?.takeIf { it.currentMediaItem?.mediaId == mediaId && audioFormatFor == mediaId }
                 ?.audioFormat
         } ?: return false
         val mime = format.sampleMimeType ?: return false
-        val videoId = uri.getQueryParameter("v") ?: return false
-        val downloaded = com.music.bitchord.download.Downloads.savedUri(this, videoId) != null
-        if (downloaded) return false
         val target = SourceResolver.targetIn(uri)
         val expectedSec = target.durationSec
         if (TrackMatcher.isSevereMismatch(expectedSec, durationSec)) {
@@ -4531,7 +4538,9 @@ class PlaybackService : MediaLibraryService() {
             uri = uri,
             target = target,
             playingMime = mime,
-            playing = withContext(Dispatchers.IO) { cachedFloor(uri, format, durationSec) },
+            playing = withContext(Dispatchers.IO) {
+                cachedFloor(mediaId, uri, format, durationSec, localUri)
+            },
         )
     }
 
@@ -4564,12 +4573,32 @@ class PlaybackService : MediaLibraryService() {
      * is wanted here; [QualityUpgrade.adoptUnresolved] settles the lossless
      * question separately, from the mime type itself.
      */
-    private fun cachedFloor(uri: Uri, format: Format, durationSec: Int?): StreamFormat? {
+    private fun cachedFloor(
+        mediaId: String,
+        uri: Uri,
+        format: Format,
+        durationSec: Int?,
+        localUri: Uri?,
+    ): StreamFormat? {
         format.bitrate.takeIf { it != Format.NO_VALUE && it > 0 }?.let {
             return StreamFormat(kbps = it / 1000)
         }
+        // Media3 often has no container bitrate for Opus/WebM. Downloads have
+        // their own measured file bitrate cache, populated from the file rather
+        // than from an add-on's catalogue claim.
+        localBitrateCache[mediaId]?.takeIf { it > 0 }?.let {
+            return StreamFormat(kbps = it)
+        }
         val seconds = durationSec?.takeIf { it > 0 } ?: return null
-        val bytes = AudioCache.contentLengthOf(uri).takeIf { it > 0 } ?: return null
+        val cachedBytes = AudioCache.contentLengthOf(uri).takeIf { it > 0 }
+        val localBytes = localUri?.let { source ->
+            when (source.scheme) {
+                "file" -> source.path?.let(::java.io.File)?.length()
+                "content" -> contentResolver.openFileDescriptor(source, "r")?.use { it.statSize }
+                else -> null
+            }
+        }?.takeIf { it > 0 }
+        val bytes = cachedBytes ?: localBytes ?: return null
         return StreamFormat(kbps = (bytes * 8 / seconds / 1000).toInt())
     }
 
@@ -4608,7 +4637,10 @@ class PlaybackService : MediaLibraryService() {
             return
         }
 
-        val upgradedUri = QualityUpgrade.upgradedUri(at.uri)
+        val upgradeIdentity = at.item.mediaMetadata.extras
+            ?.getString(EXTRA_QUALITY_LOOKUP_URI)
+            ?: at.uri.toString()
+        val upgradedUri = QualityUpgrade.upgradedUri(upgradeIdentity)
         // Whether the rendition entry already holds *this* stream's bytes,
         // asked before [force] overwrites the record of what filled it. True
         // only for a shelved upgrade being re-offered, where throwing the entry
@@ -4759,6 +4791,12 @@ class PlaybackService : MediaLibraryService() {
             val upgradedMetadata = now.item.mediaMetadata.buildUpon()
                 .setExtras(Bundle(now.item.mediaMetadata.extras ?: Bundle()).apply {
                     putBoolean(EXTRA_QUALITY_UPGRADED, true)
+                    // The new item is now backed by the proved online stream,
+                    // not by the saved file. Clear local ownership metadata so
+                    // stats and future playback don't report Local Storage.
+                    remove(EXTRA_LOCAL_URI)
+                    remove(EXTRA_LOCAL_PATH)
+                    remove(EXTRA_QUALITY_LOOKUP_URI)
                 })
                 .build()
             player.replaceMediaItem(
@@ -5542,6 +5580,10 @@ class PlaybackService : MediaLibraryService() {
      * omit — better a shorter line than a made-up number.
      */
     private fun isLocalPlayback(mediaId: String, mediaItem: MediaItem?): Boolean {
+        val activeUri = mediaItem?.localConfiguration?.uri
+        if (activeUri?.scheme == "bitchord" &&
+            activeUri.getQueryParameter(QualityUpgrade.MARKER) != null
+        ) return false
         if (mediaId.startsWith("content://") || mediaId.startsWith("file://") || mediaId.startsWith("/")) {
             return true
         }
