@@ -201,6 +201,30 @@ object DownloadStore {
         }
     }.onFailure { Log.w(TAG, "could not delete $uri: ${it.message}") }.getOrDefault(false)
 
+    /**
+     * Move a committed replacement back to the canonical track filename.
+     * Private files are atomically renamed in their current folder; MediaStore
+     * rows keep their URI and only change DISPLAY_NAME.
+     */
+    fun rename(context: Context, uri: Uri, newName: String): Uri? = runCatching {
+        if (uri.scheme == "file") {
+            val source = uri.path?.let(::File) ?: return@runCatching null
+            val folder = source.parentFile ?: return@runCatching null
+            val target = File(folder, newName)
+            if (target.exists() || !source.renameTo(target)) return@runCatching null
+            MediaScannerConnection.scanFile(context, arrayOf(target.absolutePath), null, null)
+            Uri.fromFile(target)
+        } else {
+            val updated = context.contentResolver.update(
+                uri,
+                ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, newName) },
+                null,
+                null,
+            )
+            if (updated > 0) uri else null
+        }
+    }.onFailure { Log.w(TAG, "could not rename replacement $uri: ${it.message}") }.getOrNull()
+
     // ---- Writing ------------------------------------------------------------
 
     /**
