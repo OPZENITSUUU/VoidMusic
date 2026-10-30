@@ -3688,12 +3688,7 @@ class PlaybackService : MediaLibraryService() {
     private fun recoverFrom(error: PlaybackException, player: ExoPlayer) {
         val item = player.currentMediaItem ?: return
         val mediaId = item.mediaId
-        val localUri = item.localConfiguration?.uri
-        // Downloaded songs deliberately open from file/content first. Their
-        // canonical catalogue identity is carried separately in metadata so
-        // the exact same quality-upgrade path can inspect online sources.
-        val uri = item.mediaMetadata.extras?.getString(EXTRA_QUALITY_LOOKUP_URI)
-            ?.let(Uri::parse) ?: localUri
+        val uri = item.localConfiguration?.uri
         if (refreshSongJob?.isActive == true &&
             uri?.getQueryParameter(AudioCache.REFRESH_PARAM) != null
         ) {
@@ -4254,7 +4249,11 @@ class PlaybackService : MediaLibraryService() {
     private fun lookForBetterCopy(player: ExoPlayer) {
         val item = player.currentMediaItem ?: return
         val mediaId = item.mediaId
-        val uri = item.localConfiguration?.uri
+        val localUri = item.localConfiguration?.uri
+        // Downloaded files keep local-first playback, while this canonical URI
+        // lets the second-look resolver compare all eligible online providers.
+        val uri = item.mediaMetadata.extras?.getString(EXTRA_QUALITY_LOOKUP_URI)
+            ?.let(Uri::parse) ?: localUri
         val alreadyPending = QualityUpgrade.isPending(mediaId)
         val shelved = QualityUpgrade.shelvedFor(mediaId)
         if (shelved == null && !alreadyPending && !QualityUpgrade.couldStillUpgrade(mediaId, uri)) return
@@ -4528,7 +4527,7 @@ class PlaybackService : MediaLibraryService() {
         if (TrackMatcher.isSevereMismatch(expectedSec, durationSec)) {
             TrackLog.w(
                 "BitChord",
-                "cached rendition duration mismatch: playing ${durationSec}s vs catalogue ${expectedSec}s for $videoId; discarding cache rendition",
+                "cached rendition duration mismatch: playing ${durationSec}s vs catalogue ${expectedSec}s for $mediaId; discarding cached/downloaded rendition",
                 about = mediaId,
             )
             withContext(Dispatchers.IO) { AudioCache.discardRendition(uri) }
@@ -4593,7 +4592,7 @@ class PlaybackService : MediaLibraryService() {
         val cachedBytes = AudioCache.contentLengthOf(uri).takeIf { it > 0 }
         val localBytes = localUri?.let { source ->
             when (source.scheme) {
-                "file" -> source.path?.let(::java.io.File)?.length()
+                "file" -> source.path?.let { java.io.File(it).length() }
                 "content" -> contentResolver.openFileDescriptor(source, "r")?.use { it.statSize }
                 else -> null
             }
