@@ -546,6 +546,8 @@ private const val EXTRA_SET_VIDEO_ID = "bitchord.setVideoId"
 
 /** @see Song.localUri */
 internal const val EXTRA_LOCAL_URI = "bitchord.localUri"
+/** Canonical online identity retained while a downloaded file is played locally. */
+internal const val EXTRA_QUALITY_LOOKUP_URI = "bitchord.qualityLookupUri"
 
 /** @see Song.localPath */
 internal const val EXTRA_LOCAL_PATH = "bitchord.localPath"
@@ -680,6 +682,18 @@ fun Song.toMediaItem(): MediaItem {
     // leaves that path unguarded.
     val offlineUri = localUri?.takeUnless(Downloads::isMissingLocalFile)
         ?: Downloads.verifiedSavedUri(videoId)
+    // Keep the real local URI as the initial playback source, but retain a
+    // separate canonical identity so downloaded tracks can be compared against
+    // online add-ons after playback starts. Local device songs are excluded:
+    // only files registered in Downloads have a trusted catalogue identity.
+    val qualityLookupUri = offlineUri
+        ?.takeIf {
+            Downloads.verifiedSavedUri(videoId) != null &&
+                !videoId.startsWith("content://") &&
+                !videoId.startsWith("file://") &&
+                !isVideo
+        }
+        ?.let { "bitchord://watch?v=$videoId${matchQuery()}" }
     val uriString = offlineUri ?: when {
         videoId.startsWith("content://") || videoId.startsWith("file://") -> videoId
         // Title, artist and runtime ride along in the URI because they are what
@@ -751,7 +765,7 @@ fun Song.toMediaItem(): MediaItem {
                     offlineUri != null || durationText != null ||
                     artistId != null || albumId != null || setVideoId != null ||
                     isExplicit != null || isVideo || isVideoOrigin || radioName != null ||
-                    sourceQuality != null ||
+                    sourceQuality != null || qualityLookupUri != null ||
                     playbackSource != null || playbackSourceType != null || playbackSourceId != null
                 ) {
                     setExtras(
@@ -764,6 +778,7 @@ fun Song.toMediaItem(): MediaItem {
                             EXTRA_PLAYBACK_SOURCE_TYPE to playbackSourceType?.name,
                             EXTRA_PLAYBACK_SOURCE_ID to playbackSourceId,
                             EXTRA_LOCAL_URI to offlineUri,
+                            EXTRA_QUALITY_LOOKUP_URI to qualityLookupUri,
                             EXTRA_LOCAL_PATH to localPath,
                             EXTRA_DURATION to durationText,
                             EXTRA_ARTIST_ID to artistId,
