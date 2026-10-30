@@ -1351,9 +1351,10 @@ object Downloads {
                     retriever.release()
                 }
             }.getOrNull()
-            // Unknown telemetry is not proof of good quality; allow the user to
-            // ask the providers instead of silently assuming the file is ideal.
-            bitrate == null || bitrate < 256
+            // Offer a re-fetch only when the existing file is measured below
+            // the usual top lossy tier. Unknown telemetry is not permission to
+            // replace a possibly-better file with an unverified fallback.
+            bitrate != null && bitrate < 320
         }
 
     private fun upgradeFileName(original: String): String {
