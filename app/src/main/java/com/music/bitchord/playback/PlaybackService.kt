@@ -4499,12 +4499,12 @@ class PlaybackService : MediaLibraryService() {
      *    renderer is reporting for *some other track* gets the same treatment,
      *    and has to, because it is indistinguishable from an answer — see
      *    [audioFormatFor] for what it cost to read one on trust.
-     *  - **Whether the listener owns the file.** A downloaded track resolves to
-     *    its own copy on disk — see the resolving data source above, which
-     *    answers it before the module race is ever reached, so a download has
-     *    never been a candidate for substitution. Reproduced here because this
-     *    path skips that resolver entirely; without it the second look would
-     *    spend data replacing a file the user deliberately saved.
+     *  - **Whether the listener owns the file.** A saved download stays the
+     *    immediate local source, but its catalogue identity is now carried
+     *    separately in metadata. That lets this path compare online renditions
+     *    without changing the file on disk; the existing audition must succeed
+     *    before playback is swapped, and the original file remains available
+     *    for recovery.
      *
      * @param durationSec the runtime the decoder reports, waited for by the
      *   caller — needed here to turn the size of the cache entry into a
@@ -4530,7 +4530,12 @@ class PlaybackService : MediaLibraryService() {
                 "cached rendition duration mismatch: playing ${durationSec}s vs catalogue ${expectedSec}s for $mediaId; discarding cached/downloaded rendition",
                 about = mediaId,
             )
-            withContext(Dispatchers.IO) { AudioCache.discardRendition(uri) }
+            // A downloaded file is owned by the library, not AudioCache. Keep
+            // it intact; only discard a cache rendition when this URI actually
+            // names the cache-backed stream being measured.
+            if (localUri == null || localUri == uri) {
+                withContext(Dispatchers.IO) { AudioCache.discardRendition(uri) }
+            }
         }
         return QualityUpgrade.adoptUnresolved(
             mediaId = mediaId,
@@ -4790,11 +4795,10 @@ class PlaybackService : MediaLibraryService() {
             val upgradedMetadata = now.item.mediaMetadata.buildUpon()
                 .setExtras(Bundle(now.item.mediaMetadata.extras ?: Bundle()).apply {
                     putBoolean(EXTRA_QUALITY_UPGRADED, true)
-                    // The new item is now backed by the proved online stream,
-                    // not by the saved file. Clear local ownership metadata so
-                    // stats and future playback don't report Local Storage.
-                    remove(EXTRA_LOCAL_URI)
-                    remove(EXTRA_LOCAL_PATH)
+                    // The current URI now identifies the proved online stream.
+                    // Keep the saved-file metadata as a recovery path, but remove
+                    // the lookup identity so this upgraded rendition is not
+                    // offered the same second-look search again.
                     remove(EXTRA_QUALITY_LOOKUP_URI)
                 })
                 .build()
