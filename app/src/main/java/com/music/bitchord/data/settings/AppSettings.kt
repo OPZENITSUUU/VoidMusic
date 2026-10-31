@@ -111,12 +111,12 @@ enum class ThemeMode(val label: String) {
 }
 
 /** Launcher icon aliases available in the phone app. */
-enum class LauncherIcon {
-    DEFAULT,
-    PURPLE,
-    GALAXY,
-    NEON,
-    SILVER,
+enum class LauncherIcon(val aliasClassName: String) {
+    DEFAULT("LauncherDefault"),
+    PURPLE("LauncherPurple"),
+    GALAXY("LauncherGalaxy"),
+    NEON("LauncherNeon"),
+    SILVER("LauncherSilver"),
 }
 
 /**
