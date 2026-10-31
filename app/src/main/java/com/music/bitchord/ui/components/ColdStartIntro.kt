@@ -109,19 +109,17 @@ internal fun ColdStartIntro(
                     modifier = Modifier
                         .size(172.dp)
                         .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0x44FFFFFF), Color(0x1AFFFFFF), Color(0x22B8F0E5)),
-                            ),
-                        )
+                        .background(Color(0xFF140C0A), CircleShape)
                         .border(1.dp, Color.White.copy(alpha = 0.32f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                        painter = painterResource(R.drawable.ic_splash_logo),
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(116.dp),
+                        modifier = Modifier
+                            .size(116.dp)
+                            .clip(CircleShape),
                     )
                 }
                 Spacer(Modifier.height(28.dp))
