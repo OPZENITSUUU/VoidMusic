@@ -69,6 +69,13 @@ private const val TAG = "CanvasArtworkPlayer"
  */
 private const val REPAINT_TIMEOUT_MS = 700L
 
+/** Canvas video follows the music transport and is suspended when it cannot be seen. */
+internal fun shouldPlayCanvasVideo(
+    foreground: Boolean,
+    isPlaying: Boolean,
+    pausedForTransition: Boolean,
+): Boolean = foreground && isPlaying && !pausedForTransition
+
 /**
  * The looping video that plays over a track's cover art, sized to fill and
  * clipped by whatever laid it out.
@@ -249,22 +256,14 @@ internal fun AndroidCanvasArtworkPlayer(
         player.prepare()
     }
 
-    // Gated on the app being on screen as well as on the caller's own state.
-    //
-    // This is a video decoder. Left to [isPlaying] alone it goes on decoding
-    // frames into a surface nobody can see for as long as the composition is
-    // alive — which, with the phone in a pocket and music playing, is the whole
-    // album. Worse on a detail page, whose caller passes a constant `true`
-    // because "the page is only up while it's being read": true of a page being
-    // looked at, not of one left open behind a locked screen.
-    //
-    // Held inside this component rather than asked of each caller, so no call
-    // site can forget it. The player now runs continuously in the foreground
-    // regardless of playback state, so coming back from background always has
-    // a surface ready and `onRenderedFirstFrame()` fires naturally.
+    // This is a video decoder, so stop it when the music transport is paused,
+    // the app is backgrounded, or the player is moving through a panel
+    // transition. The last painted frame remains on the TextureView while
+    // paused. On resume, the existing surface-repaint path below waits for a
+    // real frame before revealing the clip again.
     val foreground = rememberIsForeground()
-    LaunchedEffect(foreground, pausedForTransition) {
-        player.playWhenReady = foreground && !pausedForTransition
+    LaunchedEffect(foreground, isPlaying, pausedForTransition) {
+        player.playWhenReady = shouldPlayCanvasVideo(foreground, isPlaying, pausedForTransition)
     }
 
     // Repaint onto a surface that has just been handed back. A TextureView's
@@ -309,10 +308,22 @@ internal fun AndroidCanvasArtworkPlayer(
     // folded into the one above: that one is keyed on [rendered] so it fires
     // again on every fade-in, and this one only needs to start once a fade-in
     // has actually happened and then keep going for as long as it holds.
-    LaunchedEffect(rendered, refreshFrameEveryMs, frameCapturePx, clipAspect, contentMode, alignPortraitTop) {
+    LaunchedEffect(
+        rendered,
+        refreshFrameEveryMs,
+        frameCapturePx,
+        clipAspect,
+        contentMode,
+        alignPortraitTop,
+        foreground,
+        isPlaying,
+        pausedForTransition,
+    ) {
         val interval = refreshFrameEveryMs ?: return@LaunchedEffect
         Log.d(TAG, "periodic frame refresh started, interval=$interval")
-        if (!rendered) return@LaunchedEffect
+        if (!rendered || !shouldPlayCanvasVideo(foreground, isPlaying, pausedForTransition)) {
+            return@LaunchedEffect
+        }
         while (isActive) {
             delay(interval)
             val view = textureView ?: continue

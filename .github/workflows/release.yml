@@ -7,9 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing Git tag to build and publish"
+        description: "Git tag to validate, build, and publish"
         required: true
-        default: "v1.0.9"
         type: string
 
 permissions:
@@ -28,6 +27,69 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate tag, versionCode, latest release, and duplicate status
+        id: release_validation
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_PUSHED_TAG: ${{ github.event.forced }}
+        run: |
+          set -euo pipefail
+          if [[ "$FORCE_PUSHED_TAG" == "true" ]]; then
+            echo "::error::A force-updated release tag cannot be published."
+            exit 1
+          fi
+
+          python3 .github/scripts/validate_release.py \
+            --tag "$RELEASE_TAG" \
+            --gradle-file build.gradle.kts \
+            --repository .
+
+          api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
+          headers=(-H "Accept: application/vnd.github+json" \
+                   -H "Authorization: Bearer $GITHUB_TOKEN" \
+                   -H "X-GitHub-Api-Version: 2022-11-28")
+          release_status="$(curl -sS -o "$RUNNER_TEMP/existing-release.json" \
+            -w '%{http_code}' "${headers[@]}" "$api/releases/tags/$RELEASE_TAG")"
+          case "$release_status" in
+            200)
+              echo "::error::A GitHub Release already exists for $RELEASE_TAG; refusing to overwrite it."
+              exit 1
+              ;;
+            404) ;;
+            *)
+              echo "::error::Could not confirm release uniqueness (GitHub API HTTP $release_status)."
+              exit 1
+              ;;
+          esac
+
+          latest_status="$(curl -sS -o "$RUNNER_TEMP/latest-release.json" \
+            -w '%{http_code}' "${headers[@]}" "$api/releases/latest")"
+          case "$latest_status" in
+            200)
+              latest_tag="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("tag_name", ""))' "$RUNNER_TEMP/latest-release.json")"
+              if [[ -z "$latest_tag" ]]; then
+                echo "::error::GitHub returned a latest release without a tag."
+                exit 1
+              fi
+              ;;
+            404) latest_tag="" ;;
+            *)
+              echo "::error::Could not confirm latest release ordering (GitHub API HTTP $latest_status)."
+              exit 1
+              ;;
+          esac
+
+          version_code="$(python3 .github/scripts/validate_release.py \
+            --tag "$RELEASE_TAG" \
+            --gradle-file build.gradle.kts \
+            --repository . \
+            --latest-release-tag "$latest_tag" \
+            --print-version-code)"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -106,6 +168,7 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+          EXPECTED_VERSION_CODE: ${{ steps.release_validation.outputs.version_code }}
         run: |
           set -euo pipefail
           apk=app/build/outputs/apk/prod/release/app-prod-universal-release.apk
@@ -116,6 +179,7 @@ jobs:
           badging="$("$build_tools/aapt" dump badging "$apk")"
           grep -F "package: name='com.voidmusic.player'" <<< "$badging"
           grep -F "versionName='$expected_version'" <<< "$badging"
+          grep -F "versionCode='$EXPECTED_VERSION_CODE'" <<< "$badging"
           "$build_tools/zipalign" -c -v 4 "$apk"
           "$build_tools/apksigner" verify --verbose --print-certs "$apk"
           mkdir -p dist
@@ -134,14 +198,9 @@ jobs:
           body: |
             ## Void Music ${{ inputs.release_tag || github.ref_name }}
 
-            Official Void Music Android release.
+            Bug-fix release.
 
-            - Adds refresh-current-song support and improves add-on stream re-resolution.
-            - Fixes add-on playback priority: enabled add-ons remain eligible at every network setting and are always asked for their best/lossless tier. This can use more mobile data than the Low ceiling; YouTube and other non-add-on fallbacks still respect the selected ceiling.
-            - Improves add-on network-consent handling, URL redaction, and LastWave search-result normalization.
-            - Enforces provider-aware disk caching and a low-storage guard.
-            - Adds Standard (one upcoming track) and Aggressive (up to five tracks) add-on pre-cache modes.
-            - Checks for new releases at app startup and offers Update Now / Update Later.
+            - Pauses animated cover-art video decoding and periodic frame capture when music is paused, the app is backgrounded, or the player is transitioning, reducing unnecessary work.
             - Keeps the existing application ID and release signing certificate.
 
             Android can install this as an in-place update only over builds signed with the same certificate. Older beta builds signed with a different certificate cannot be updated in place.
